@@ -5,8 +5,11 @@ dist/
 .env
 .env.local
 !.env.example
-server/data/proxies/*.json
-server/data/templates/*.json
+server/data/*
+!server/data/proxies/
+!server/data/templates/
+server/data/proxies/*
+server/data/templates/*
 !server/data/proxies/.gitkeep
 !server/data/templates/.gitkeep
 server/test-bundles/*.zip
