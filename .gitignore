@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+.env
+.env.local
+!.env.example
+server/data/proxies/*.json
+server/data/templates/*.json
+!server/data/proxies/.gitkeep
+!server/data/templates/.gitkeep
+server/test-bundles/*.zip

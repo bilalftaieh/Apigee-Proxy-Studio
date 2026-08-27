@@ -1,0 +1,117 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --bg-0: #0a0c12;
+  --bg-1: #10131c;
+  --bg-2: #161a25;
+  --bg-3: #1c2130;
+  --bg-hover: #232939;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.14);
+
+  /* Contrast ratios below are against --bg-3 (#1c2130), the lightest surface any
+     of these sit on — so every step clears WCAG AA (4.5:1) on every surface.
+     --text-3 carries real copy (field hints, nav subtitles, card subtitles) at
+     11px, so it can't be treated as decorative. */
+  --text-0: #eef1f7;
+  --text-1: #c2c9d8; /* 9.65:1 */
+  --text-2: #9ba4b8; /* 6.41:1 */
+  --text-3: #828ca3; /* 4.76:1 */
+
+  --accent-teal: #22d3aa;
+  --accent-blue: #6c8eff;
+  --accent-purple: #a06cff;
+  --accent-grad: linear-gradient(135deg, var(--accent-teal) 0%, var(--accent-blue) 55%, var(--accent-purple) 100%);
+  --accent-grad-soft: linear-gradient(135deg, rgba(34, 211, 170, 0.16) 0%, rgba(108, 142, 255, 0.16) 55%, rgba(160, 108, 255, 0.16) 100%);
+
+  --success: #2fd48f;
+  --error: #f2555c;
+  --warning: #ffb454;
+  --info: #6c8eff;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.45);
+  --shadow-glow: 0 0 0 1px rgba(108, 142, 255, 0.25), 0 8px 30px rgba(108, 142, 255, 0.15);
+
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background:
+    radial-gradient(1200px 600px at 15% -10%, rgba(108, 142, 255, 0.10), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(34, 211, 170, 0.08), transparent 55%),
+    var(--bg-0);
+  color: var(--text-0);
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--bg-3);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--bg-hover);
+  background-clip: padding-box;
+}
+
+button {
+  font-family: inherit;
+}
+
+/* One visible focus ring for everything reachable by keyboard. Inputs opt out
+   below because they already signal focus with a border + glow, and an outline
+   on top of that reads as an error state. */
+:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
+}
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+  color: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}

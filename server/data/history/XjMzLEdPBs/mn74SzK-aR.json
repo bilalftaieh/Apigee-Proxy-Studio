@@ -1,0 +1,134 @@
+{
+  "id": "mn74SzK-aR",
+  "savedAt": 1786885942602,
+  "proxy": {
+    "id": "XjMzLEdPBs",
+    "name": "infath-out-socpa",
+    "basePath": "/socpa/v1",
+    "description": "infath-out-socpa",
+    "proxyEndpointName": "default",
+    "policies": [
+      {
+        "id": "MKL3dHasXF",
+        "name": "FC-OAuth",
+        "type": "FlowCallout",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<FlowCallout async=\"false\" continueOnError=\"false\" enabled=\"true\" name=\"FC-OAuth\">\n    <DisplayName>FC-OAuth</DisplayName>\n    <SharedFlowBundle>SF-OAuth</SharedFlowBundle>\n</FlowCallout>"
+      },
+      {
+        "id": "rgWkaNFGX9",
+        "name": "AM-GetLicenseStatus",
+        "type": "AssignMessage",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<AssignMessage async=\"false\" continueOnError=\"false\" enabled=\"true\" name=\"AM-GetLicenseStatus\">\n    <DisplayName>AM-GetLicenseStatus</DisplayName>\n    <AssignVariable>\n        <Name>CompletePathURL</Name>\n        <Template>/MCIMediaApi/api/Values/GetLicenseStatus</Template>\n    </AssignVariable>\n    <IgnoreUnresolvedVariables>false</IgnoreUnresolvedVariables>\n</AssignMessage>"
+      },
+      {
+        "id": "4FNSln736u",
+        "name": "AM-GetLicenseDetails",
+        "type": "AssignMessage",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<AssignMessage async=\"false\" continueOnError=\"false\" enabled=\"true\" name=\"AM-GetLicenseDetails\">\n    <DisplayName>AM-GetLicenseDetails</DisplayName>\n    <AssignVariable>\n        <Name>CompletePathURL</Name>\n        <Template>/MCIMediaApi/api/Values/GetLicenseDetails</Template>\n    </AssignVariable>\n    <IgnoreUnresolvedVariables>false</IgnoreUnresolvedVariables>\n</AssignMessage>"
+      },
+      {
+        "id": "DRmezL2p9f",
+        "name": "FC-GetSocpaToken",
+        "type": "FlowCallout",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<FlowCallout async=\"false\" continueOnError=\"false\" enabled=\"true\" name=\"FC-GetSocpaToken\">\n    <DisplayName>FC-GetSocpaToken</DisplayName>\n    <SharedFlowBundle>shared-flow-name</SharedFlowBundle>\n</FlowCallout>"
+      }
+    ],
+    "targets": [
+      {
+        "id": "xKtHlibHIK",
+        "name": "Socpa-Server",
+        "mode": "targetServer",
+        "url": {
+          "mode": "literal",
+          "value": "https://"
+        },
+        "targetServers": [
+          "Socpa-Server"
+        ],
+        "description": "",
+        "preFlow": {
+          "request": [
+            {
+              "policyName": "FC-GetSocpaToken"
+            }
+          ],
+          "response": []
+        },
+        "postFlow": {
+          "request": [],
+          "response": []
+        },
+        "flows": [],
+        "faultRules": {
+          "steps": []
+        },
+        "path": {
+          "mode": "literal",
+          "value": "CompletePathURL"
+        }
+      }
+    ],
+    "preFlow": {
+      "request": [
+        {
+          "policyName": "FC-OAuth"
+        }
+      ],
+      "response": []
+    },
+    "postFlow": {
+      "request": [],
+      "response": []
+    },
+    "flows": [
+      {
+        "id": "yF17xn48cP",
+        "name": "GET /MCIMediaApi/api/Values/GetLicenseDetails/618",
+        "description": "",
+        "conditionMode": "simple",
+        "pathValue": "/MCIMediaApi/api/Values/GetLicenseDetails/*",
+        "pathOperator": "MatchesPath",
+        "verb": "GET",
+        "condition": "(proxy.pathsuffix MatchesPath \"/MCIMediaApi/api/Values/GetLicenseDetails/*\") and (request.verb = \"GET\")",
+        "request": [
+          {
+            "policyName": "AM-GetLicenseStatus"
+          }
+        ],
+        "response": []
+      },
+      {
+        "id": "zb0_TJwQ0f",
+        "name": "GET /MCIMediaApi/api/Values/GetLicenseStatus/250",
+        "description": "",
+        "conditionMode": "simple",
+        "pathValue": "/MCIMediaApi/api/Values/GetLicenseStatus/250",
+        "pathOperator": "MatchesPath",
+        "verb": "GET",
+        "condition": "(proxy.pathsuffix MatchesPath \"/MCIMediaApi/api/Values/GetLicenseStatus/250\") and (request.verb = \"GET\")",
+        "request": [
+          {
+            "policyName": "AM-GetLicenseDetails"
+          }
+        ],
+        "response": []
+      }
+    ],
+    "routeRules": [
+      {
+        "id": "32icXgW9Tz",
+        "name": "Socpa-Server",
+        "targetName": "Socpa-Server",
+        "condition": ""
+      }
+    ],
+    "faultRules": {
+      "steps": []
+    },
+    "lintExcludes": [],
+    "environments": [],
+    "createdAt": 1786868174781,
+    "updatedAt": 1786885866032,
+    "tests": []
+  }
+}

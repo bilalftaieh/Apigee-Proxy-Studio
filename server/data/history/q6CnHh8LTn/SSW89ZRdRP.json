@@ -1,0 +1,521 @@
+{
+  "id": "SSW89ZRdRP",
+  "savedAt": 1787223764906,
+  "proxy": {
+    "id": "q6CnHh8LTn",
+    "name": "infath-out-rjhi",
+    "basePath": "/infath-out-rjhi",
+    "description": "infath-out-rjhi — Al Rajhi Bank (RJHI) B2B/VA services proxy (dev). Routes 12 conditional flows to RJHI backend paths via a Target Server, transforming JSON↔XML where the backend needs XML.",
+    "proxyEndpointName": "default",
+    "policies": [
+      {
+        "id": "pol-RF-EmptyRequestBody",
+        "name": "RF-EmptyRequestBody",
+        "type": "RaiseFault",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<RaiseFault async=\"false\" continueOnError=\"false\" enabled=\"true\" name=\"RF-EmptyRequestBody\">\n    <DisplayName>RF-EmptyRequestBody</DisplayName>\n    <FaultResponse>\n        <Set>\n            <Headers>\n                <Header name=\"Content-Type\">application/json</Header>\n            </Headers>\n            <StatusCode>400</StatusCode>\n            <ReasonPhrase>Bad Request</ReasonPhrase>\n            <Payload contentType=\"application/json\"><![CDATA[{\"error\":{\"code\":\"EMPTY_REQUEST_BODY\",\"message\":\"A request body is required for {proxy.pathsuffix}.\"}}]]></Payload>\n        </Set>\n    </FaultResponse>\n    <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>\n</RaiseFault>"
+      },
+      {
+        "id": "pol-J2X-RequestBody",
+        "name": "J2X-RequestBody",
+        "type": "JSONToXML",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<JSONToXML async=\"false\" continueOnError=\"false\" enabled=\"true\" name=\"J2X-RequestBody\">\n    <DisplayName>J2X-RequestBody</DisplayName>\n    <Source>request</Source>\n    <OutputVariable>request</OutputVariable>\n    <Options>\n        <RecognizeNumber>true</RecognizeNumber>\n        <RecognizeBoolean>true</RecognizeBoolean>\n        <RecognizeNull>true</RecognizeNull>\n    </Options>\n</JSONToXML>"
+      },
+      {
+        "id": "pol-X2J-ResponseBody",
+        "name": "X2J-ResponseBody",
+        "type": "XMLToJSON",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<XMLToJSON async=\"false\" continueOnError=\"false\" enabled=\"true\" name=\"X2J-ResponseBody\">\n    <DisplayName>X2J-ResponseBody</DisplayName>\n    <Source>response</Source>\n    <OutputVariable>response</OutputVariable>\n    <Options>\n        <RecognizeNumber>true</RecognizeNumber>\n        <RecognizeBoolean>true</RecognizeBoolean>\n        <RecognizeNull>true</RecognizeNull>\n        <NullValue>NULL</NullValue>\n        <AttributeBlockName>#attrs</AttributeBlockName>\n        <AttributePrefix>@</AttributePrefix>\n    </Options>\n</XMLToJSON>"
+      },
+      {
+        "id": "pol-AM-Set-BankTransfer-Path",
+        "name": "AM-Set-BankTransfer-Path",
+        "type": "AssignMessage",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<AssignMessage async=\"false\" continueOnError=\"false\" enabled=\"true\" name=\"AM-Set-BankTransfer-Path\">\n    <DisplayName>AM-Set-BankTransfer-Path</DisplayName>\n    <AssignVariable>\n        <Name>CompletePathUrl</Name>\n        <Template>/B2BService/epayments/paymentMT101</Template>\n    </AssignVariable>\n    <IgnoreUnresolvedVariables>false</IgnoreUnresolvedVariables>\n</AssignMessage>"
+      },
+      {
+        "id": "pol-EV-BankTransfer",
+        "name": "EV-BankTransfer",
+        "type": "ExtractVariables",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<ExtractVariables async=\"false\" continueOnError=\"false\" enabled=\"true\" name=\"EV-BankTransfer\">\n    <DisplayName>EV-BankTransfer</DisplayName>\n    <Source>request</Source>\n    <VariablePrefix>extracted</VariablePrefix>\n    <JSONPayload>\n        <Variable name=\"BankTransfer_EncryptedPayload\">\n            <JSONPath>$.EncryptedPayload</JSONPath>\n        </Variable>\n    </JSONPayload>\n    <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>\n</ExtractVariables>"
+      },
+      {
+        "id": "pol-AM-BankTransfer-UnwrapPayload",
+        "name": "AM-BankTransfer-UnwrapPayload",
+        "type": "AssignMessage",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<AssignMessage async=\"false\" continueOnError=\"false\" enabled=\"true\" name=\"AM-BankTransfer-UnwrapPayload\">\n    <DisplayName>AM-BankTransfer-UnwrapPayload</DisplayName>\n    <Set>\n        <Payload contentType=\"text/xml\">{extracted.BankTransfer_EncryptedPayload}</Payload>\n    </Set>\n    <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>\n</AssignMessage>"
+      },
+      {
+        "id": "pol-AM-Set-PaymentInquiry-Path",
+        "name": "AM-Set-PaymentInquiry-Path",
+        "type": "AssignMessage",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<AssignMessage async=\"false\" continueOnError=\"false\" enabled=\"true\" name=\"AM-Set-PaymentInquiry-Path\">\n    <DisplayName>AM-Set-PaymentInquiry-Path</DisplayName>\n    <AssignVariable>\n        <Name>CompletePathUrl</Name>\n        <Template>/B2BService/epayments/paymentStatus</Template>\n    </AssignVariable>\n    <IgnoreUnresolvedVariables>false</IgnoreUnresolvedVariables>\n</AssignMessage>"
+      },
+      {
+        "id": "pol-AM-Set-CreateVirtualAccount-Path",
+        "name": "AM-Set-CreateVirtualAccount-Path",
+        "type": "AssignMessage",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<AssignMessage async=\"false\" continueOnError=\"false\" enabled=\"true\" name=\"AM-Set-CreateVirtualAccount-Path\">\n    <DisplayName>AM-Set-CreateVirtualAccount-Path</DisplayName>\n    <AssignVariable>\n        <Name>CompletePathUrl</Name>\n        <Template>/VARESTService/RestAPI/VaCreation</Template>\n    </AssignVariable>\n    <IgnoreUnresolvedVariables>false</IgnoreUnresolvedVariables>\n</AssignMessage>"
+      },
+      {
+        "id": "pol-AM-Set-MT940-Path",
+        "name": "AM-Set-MT940-Path",
+        "type": "AssignMessage",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<AssignMessage async=\"false\" continueOnError=\"false\" enabled=\"true\" name=\"AM-Set-MT940-Path\">\n    <DisplayName>AM-Set-MT940-Path</DisplayName>\n    <AssignVariable>\n        <Name>CompletePathUrl</Name>\n        <Template>/B2BService/epayments/statement</Template>\n    </AssignVariable>\n    <IgnoreUnresolvedVariables>false</IgnoreUnresolvedVariables>\n</AssignMessage>"
+      },
+      {
+        "id": "pol-AM-Set-MT-940ExtendedStatement-Path",
+        "name": "AM-Set-MT-940ExtendedStatement-Path",
+        "type": "AssignMessage",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<AssignMessage async=\"false\" continueOnError=\"false\" enabled=\"true\" name=\"AM-Set-MT-940ExtendedStatement-Path\">\n    <DisplayName>AM-Set-MT-940ExtendedStatement-Path</DisplayName>\n    <AssignVariable>\n        <Name>CompletePathUrl</Name>\n        <Template>/B2BService/epayments/statementExt</Template>\n    </AssignVariable>\n    <IgnoreUnresolvedVariables>false</IgnoreUnresolvedVariables>\n</AssignMessage>"
+      },
+      {
+        "id": "pol-AM-Set-SADADPayment-Path",
+        "name": "AM-Set-SADADPayment-Path",
+        "type": "AssignMessage",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<AssignMessage async=\"false\" continueOnError=\"false\" enabled=\"true\" name=\"AM-Set-SADADPayment-Path\">\n    <DisplayName>AM-Set-SADADPayment-Path</DisplayName>\n    <AssignVariable>\n        <Name>CompletePathUrl</Name>\n        <Template>/B2BService/epayments/sadadTransaction</Template>\n    </AssignVariable>\n    <IgnoreUnresolvedVariables>false</IgnoreUnresolvedVariables>\n</AssignMessage>"
+      },
+      {
+        "id": "pol-AM-Set-VABulkPayment-Path",
+        "name": "AM-Set-VABulkPayment-Path",
+        "type": "AssignMessage",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<AssignMessage async=\"false\" continueOnError=\"false\" enabled=\"true\" name=\"AM-Set-VABulkPayment-Path\">\n    <DisplayName>AM-Set-VABulkPayment-Path</DisplayName>\n    <AssignVariable>\n        <Name>CompletePathUrl</Name>\n        <Template>/VARESTService/VABulkPayment/file-payment</Template>\n    </AssignVariable>\n    <IgnoreUnresolvedVariables>false</IgnoreUnresolvedVariables>\n</AssignMessage>"
+      },
+      {
+        "id": "pol-AM-Set-BalanceEnquiryMainAccount-Path",
+        "name": "AM-Set-BalanceEnquiryMainAccount-Path",
+        "type": "AssignMessage",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<AssignMessage async=\"false\" continueOnError=\"false\" enabled=\"true\" name=\"AM-Set-BalanceEnquiryMainAccount-Path\">\n    <DisplayName>AM-Set-BalanceEnquiryMainAccount-Path</DisplayName>\n    <AssignVariable>\n        <Name>CompletePathUrl</Name>\n        <Template>/B2BService/epayments/balanceEnquiry</Template>\n    </AssignVariable>\n    <IgnoreUnresolvedVariables>false</IgnoreUnresolvedVariables>\n</AssignMessage>"
+      },
+      {
+        "id": "pol-AM-Set-BalanceEnquiryVA-Path",
+        "name": "AM-Set-BalanceEnquiryVA-Path",
+        "type": "AssignMessage",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<AssignMessage async=\"false\" continueOnError=\"false\" enabled=\"true\" name=\"AM-Set-BalanceEnquiryVA-Path\">\n    <DisplayName>AM-Set-BalanceEnquiryVA-Path</DisplayName>\n    <AssignVariable>\n        <Name>CompletePathUrl</Name>\n        <Template>/VARESTService/RestAPI/arrayBalance</Template>\n    </AssignVariable>\n    <IgnoreUnresolvedVariables>false</IgnoreUnresolvedVariables>\n</AssignMessage>"
+      },
+      {
+        "id": "pol-AM-Set-VirtualAccountStatement-Path",
+        "name": "AM-Set-VirtualAccountStatement-Path",
+        "type": "AssignMessage",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<AssignMessage async=\"false\" continueOnError=\"false\" enabled=\"true\" name=\"AM-Set-VirtualAccountStatement-Path\">\n    <DisplayName>AM-Set-VirtualAccountStatement-Path</DisplayName>\n    <AssignVariable>\n        <Name>CompletePathUrl</Name>\n        <Template>/VARESTService/RestAPI/accounts/VAstatements</Template>\n    </AssignVariable>\n    <IgnoreUnresolvedVariables>false</IgnoreUnresolvedVariables>\n</AssignMessage>"
+      },
+      {
+        "id": "pol-AM-Set-SadadEnquiry-Path",
+        "name": "AM-Set-SadadEnquiry-Path",
+        "type": "AssignMessage",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<AssignMessage async=\"false\" continueOnError=\"false\" enabled=\"true\" name=\"AM-Set-SadadEnquiry-Path\">\n    <DisplayName>AM-Set-SadadEnquiry-Path</DisplayName>\n    <AssignVariable>\n        <Name>CompletePathUrl</Name>\n        <Template>/B2BService/epayments/sadadEnquiry</Template>\n    </AssignVariable>\n    <IgnoreUnresolvedVariables>false</IgnoreUnresolvedVariables>\n</AssignMessage>"
+      },
+      {
+        "id": "pol-AM-Set-VABulkPaymentEnquiry-Path",
+        "name": "AM-Set-VABulkPaymentEnquiry-Path",
+        "type": "AssignMessage",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<AssignMessage async=\"false\" continueOnError=\"false\" enabled=\"true\" name=\"AM-Set-VABulkPaymentEnquiry-Path\">\n    <DisplayName>AM-Set-VABulkPaymentEnquiry-Path</DisplayName>\n    <AssignVariable>\n        <Name>CompletePathUrl</Name>\n        <Template>/VARESTService/VABulkPayment/file-payment/searchByClientId</Template>\n    </AssignVariable>\n    <IgnoreUnresolvedVariables>false</IgnoreUnresolvedVariables>\n</AssignMessage>"
+      },
+      {
+        "id": "pol-RF-UnsupportedOperation",
+        "name": "RF-UnsupportedOperation",
+        "type": "RaiseFault",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<RaiseFault async=\"false\" continueOnError=\"false\" enabled=\"true\" name=\"RF-UnsupportedOperation\">\n    <DisplayName>RF-UnsupportedOperation</DisplayName>\n    <FaultResponse>\n        <Set>\n            <Headers>\n                <Header name=\"Content-Type\">application/json</Header>\n            </Headers>\n            <StatusCode>404</StatusCode>\n            <ReasonPhrase>Not Found</ReasonPhrase>\n            <Payload contentType=\"application/json\"><![CDATA[{\"error\":{\"code\":\"UNSUPPORTED_OPERATION\",\"message\":\"No matching service operation for this request.\"}}]]></Payload>\n        </Set>\n    </FaultResponse>\n    <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>\n</RaiseFault>"
+      },
+      {
+        "id": "pol-AM-Set-PathSuffix-url",
+        "name": "AM-Set-PathSuffix-url",
+        "type": "AssignMessage",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<AssignMessage async=\"false\" continueOnError=\"false\" enabled=\"true\" name=\"AM-Set-PathSuffix-url\">\n    <DisplayName>AM-Set-PathSuffix-url</DisplayName>\n    <AssignVariable>\n        <Name>target.copy.pathsuffix</Name>\n        <Value>false</Value>\n    </AssignVariable>\n    <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>\n</AssignMessage>"
+      },
+      {
+        "id": "pol-AM-SetJsonContentType",
+        "name": "AM-SetJsonContentType",
+        "type": "AssignMessage",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<AssignMessage async=\"false\" continueOnError=\"false\" enabled=\"true\" name=\"AM-SetJsonContentType\">\n    <DisplayName>AM-SetJsonContentType</DisplayName>\n    <Set>\n        <Headers>\n            <Header name=\"Content-Type\">application/json</Header>\n        </Headers>\n    </Set>\n    <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>\n</AssignMessage>"
+      },
+      {
+        "id": "pol-RF-MalformedPayload",
+        "name": "RF-MalformedPayload",
+        "type": "RaiseFault",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<RaiseFault async=\"false\" continueOnError=\"false\" enabled=\"true\" name=\"RF-MalformedPayload\">\n    <DisplayName>RF-MalformedPayload</DisplayName>\n    <FaultResponse>\n        <Set>\n            <Headers>\n                <Header name=\"Content-Type\">application/json</Header>\n            </Headers>\n            <StatusCode>400</StatusCode>\n            <ReasonPhrase>Bad Request</ReasonPhrase>\n            <Payload contentType=\"application/json\"><![CDATA[{\"error\":{\"code\":\"MALFORMED_PAYLOAD\",\"message\":\"The request body could not be parsed.\"}}]]></Payload>\n        </Set>\n    </FaultResponse>\n    <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>\n</RaiseFault>"
+      },
+      {
+        "id": "pol-FC-ErrorHandling",
+        "name": "FC-ErrorHandling",
+        "type": "FlowCallout",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<FlowCallout async=\"false\" continueOnError=\"false\" enabled=\"true\" name=\"FC-ErrorHandling\">\n    <DisplayName>FC-ErrorHandling</DisplayName>\n    <SharedFlowBundle>SF-generalErrorHandling</SharedFlowBundle>\n</FlowCallout>"
+      },
+      {
+        "id": "7JoMmVUolk",
+        "name": "FC-OAuth",
+        "type": "FlowCallout",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<FlowCallout async=\"false\" continueOnError=\"false\" enabled=\"true\" name=\"FC-OAuth\">\n    <DisplayName>FC-OAuth</DisplayName>\n    <SharedFlowBundle>SF-OAuth</SharedFlowBundle>\n</FlowCallout>"
+      },
+      {
+        "id": "8KtMPeEnsy",
+        "name": "FC-ServiceUnavailable",
+        "type": "FlowCallout",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<FlowCallout async=\"false\" continueOnError=\"false\" enabled=\"true\" name=\"FC-ServiceUnavailable\">\n    <DisplayName>FC-ServiceUnavailable</DisplayName>\n    <SharedFlowBundle>SF-Service-Unavailable</SharedFlowBundle>\n</FlowCallout>"
+      }
+    ],
+    "targets": [
+      {
+        "id": "target-rjhi-backend",
+        "name": "TG-RJHI-Backend",
+        "mode": "targetServer",
+        "url": {
+          "mode": "literal",
+          "value": "https://"
+        },
+        "targetServers": [
+          "ts-rjhi-backend"
+        ],
+        "description": "RJHI backend (dev) — Path resolved per-flow via the CompletePathUrl variable set by each conditional flow's AssignMessage policy.",
+        "preFlow": {
+          "request": [
+            {
+              "policyName": "AM-Set-PathSuffix-url"
+            }
+          ],
+          "response": []
+        },
+        "postFlow": {
+          "request": [],
+          "response": [
+            {
+              "policyName": "X2J-ResponseBody",
+              "condition": "response.header.Content-Type != null and response.header.Content-Type JavaRegex \".*(?i)xml.*\""
+            }
+          ]
+        },
+        "flows": [],
+        "faultRules": {
+          "steps": []
+        },
+        "path": {
+          "mode": "variable",
+          "value": "CompletePathUrl"
+        }
+      }
+    ],
+    "preFlow": {
+      "request": [
+        {
+          "policyName": "FC-OAuth"
+        }
+      ],
+      "response": []
+    },
+    "postFlow": {
+      "request": [],
+      "response": [
+        {
+          "policyName": "AM-SetJsonContentType"
+        }
+      ]
+    },
+    "flows": [
+      {
+        "id": "flow-BankTransfer",
+        "name": "POST /BankTransfer",
+        "description": "BankTransfer — routes to backend /B2BService/epayments/paymentMT101 (XML backend)",
+        "conditionMode": "simple",
+        "pathValue": "/BankTransfer",
+        "pathOperator": "MatchesPath",
+        "verb": "POST",
+        "condition": "(proxy.pathsuffix MatchesPath \"/BankTransfer\") and (request.verb = \"POST\")",
+        "request": [
+          {
+            "policyName": "EV-BankTransfer",
+            "condition": "request.content != null"
+          },
+          {
+            "policyName": "RF-EmptyRequestBody",
+            "condition": "extracted.BankTransfer_EncryptedPayload = null or extracted.BankTransfer_EncryptedPayload = \"\""
+          },
+          {
+            "policyName": "AM-BankTransfer-UnwrapPayload"
+          },
+          {
+            "policyName": "AM-Set-BankTransfer-Path"
+          }
+        ],
+        "response": []
+      },
+      {
+        "id": "flow-PaymentInquiry",
+        "name": "POST /PaymentInquiry",
+        "description": "PaymentInquiry — routes to backend /B2BService/epayments/paymentStatus (XML backend)",
+        "conditionMode": "simple",
+        "pathValue": "/PaymentInquiry",
+        "pathOperator": "MatchesPath",
+        "verb": "POST",
+        "condition": "(proxy.pathsuffix MatchesPath \"/PaymentInquiry\") and (request.verb = \"POST\")",
+        "request": [
+          {
+            "policyName": "RF-EmptyRequestBody",
+            "condition": "request.content = null or request.content = \"\""
+          },
+          {
+            "policyName": "J2X-RequestBody"
+          },
+          {
+            "policyName": "AM-Set-PaymentInquiry-Path"
+          }
+        ],
+        "response": []
+      },
+      {
+        "id": "flow-CreateVirtualAccount",
+        "name": "POST /CreateVirtualAccount",
+        "description": "CreateVirtualAccount — routes to backend /VARESTService/RestAPI/VaCreation (JSON backend)",
+        "conditionMode": "simple",
+        "pathValue": "/CreateVirtualAccount",
+        "pathOperator": "MatchesPath",
+        "verb": "POST",
+        "condition": "(proxy.pathsuffix MatchesPath \"/CreateVirtualAccount\") and (request.verb = \"POST\")",
+        "request": [
+          {
+            "policyName": "RF-EmptyRequestBody",
+            "condition": "request.content = null or request.content = \"\""
+          },
+          {
+            "policyName": "AM-Set-CreateVirtualAccount-Path"
+          }
+        ],
+        "response": []
+      },
+      {
+        "id": "flow-MT940",
+        "name": "POST /MT940",
+        "description": "MT940 — routes to backend /B2BService/epayments/statement (XML backend)",
+        "conditionMode": "simple",
+        "pathValue": "/MT940",
+        "pathOperator": "MatchesPath",
+        "verb": "POST",
+        "condition": "(proxy.pathsuffix MatchesPath \"/MT940\") and (request.verb = \"POST\")",
+        "request": [
+          {
+            "policyName": "RF-EmptyRequestBody",
+            "condition": "request.content = null or request.content = \"\""
+          },
+          {
+            "policyName": "J2X-RequestBody"
+          },
+          {
+            "policyName": "AM-Set-MT940-Path"
+          }
+        ],
+        "response": []
+      },
+      {
+        "id": "flow-MT-940ExtendedStatement",
+        "name": "POST /MT-940ExtendedStatement",
+        "description": "MT-940ExtendedStatement — routes to backend /B2BService/epayments/statementExt (XML backend)",
+        "conditionMode": "simple",
+        "pathValue": "/MT-940ExtendedStatement",
+        "pathOperator": "MatchesPath",
+        "verb": "POST",
+        "condition": "(proxy.pathsuffix MatchesPath \"/MT-940ExtendedStatement\") and (request.verb = \"POST\")",
+        "request": [
+          {
+            "policyName": "RF-EmptyRequestBody",
+            "condition": "request.content = null or request.content = \"\""
+          },
+          {
+            "policyName": "J2X-RequestBody"
+          },
+          {
+            "policyName": "AM-Set-MT-940ExtendedStatement-Path"
+          }
+        ],
+        "response": []
+      },
+      {
+        "id": "flow-SADADPayment",
+        "name": "POST /SADADPayment",
+        "description": "SADADPayment — routes to backend /B2BService/epayments/sadadTransaction (XML backend)",
+        "conditionMode": "simple",
+        "pathValue": "/SADADPayment",
+        "pathOperator": "MatchesPath",
+        "verb": "POST",
+        "condition": "(proxy.pathsuffix MatchesPath \"/SADADPayment\") and (request.verb = \"POST\")",
+        "request": [
+          {
+            "policyName": "RF-EmptyRequestBody",
+            "condition": "request.content = null or request.content = \"\""
+          },
+          {
+            "policyName": "J2X-RequestBody"
+          },
+          {
+            "policyName": "AM-Set-SADADPayment-Path"
+          }
+        ],
+        "response": []
+      },
+      {
+        "id": "flow-VABulkPayment",
+        "name": "POST /VABulkPayment",
+        "description": "VABulkPayment — routes to backend /VARESTService/VABulkPayment/file-payment (JSON backend)",
+        "conditionMode": "simple",
+        "pathValue": "/VABulkPayment",
+        "pathOperator": "MatchesPath",
+        "verb": "POST",
+        "condition": "(proxy.pathsuffix MatchesPath \"/VABulkPayment\") and (request.verb = \"POST\")",
+        "request": [
+          {
+            "policyName": "RF-EmptyRequestBody",
+            "condition": "request.content = null or request.content = \"\""
+          },
+          {
+            "policyName": "AM-Set-VABulkPayment-Path"
+          }
+        ],
+        "response": []
+      },
+      {
+        "id": "flow-BalanceEnquiryMainAccount",
+        "name": "POST /BalanceEnquiryMainAccount",
+        "description": "BalanceEnquiryMainAccount — routes to backend /B2BService/epayments/balanceEnquiry (XML backend)",
+        "conditionMode": "simple",
+        "pathValue": "/BalanceEnquiryMainAccount",
+        "pathOperator": "MatchesPath",
+        "verb": "POST",
+        "condition": "(proxy.pathsuffix MatchesPath \"/BalanceEnquiryMainAccount\") and (request.verb = \"POST\")",
+        "request": [
+          {
+            "policyName": "RF-EmptyRequestBody",
+            "condition": "request.content = null or request.content = \"\""
+          },
+          {
+            "policyName": "J2X-RequestBody"
+          },
+          {
+            "policyName": "AM-Set-BalanceEnquiryMainAccount-Path"
+          }
+        ],
+        "response": []
+      },
+      {
+        "id": "flow-BalanceEnquiryVA",
+        "name": "POST /BalanceEnquiryVA",
+        "description": "BalanceEnquiryVA — routes to backend /VARESTService/RestAPI/arrayBalance (JSON backend)",
+        "conditionMode": "simple",
+        "pathValue": "/BalanceEnquiryVA",
+        "pathOperator": "MatchesPath",
+        "verb": "POST",
+        "condition": "(proxy.pathsuffix MatchesPath \"/BalanceEnquiryVA\") and (request.verb = \"POST\")",
+        "request": [
+          {
+            "policyName": "RF-EmptyRequestBody",
+            "condition": "request.content = null or request.content = \"\""
+          },
+          {
+            "policyName": "AM-Set-BalanceEnquiryVA-Path"
+          }
+        ],
+        "response": []
+      },
+      {
+        "id": "flow-VirtualAccountStatement",
+        "name": "POST /VirtualAccountStatement",
+        "description": "VirtualAccountStatement — routes to backend /VARESTService/RestAPI/accounts/VAstatements (JSON backend)",
+        "conditionMode": "simple",
+        "pathValue": "/VirtualAccountStatement",
+        "pathOperator": "MatchesPath",
+        "verb": "POST",
+        "condition": "(proxy.pathsuffix MatchesPath \"/VirtualAccountStatement\") and (request.verb = \"POST\")",
+        "request": [
+          {
+            "policyName": "RF-EmptyRequestBody",
+            "condition": "request.content = null or request.content = \"\""
+          },
+          {
+            "policyName": "AM-Set-VirtualAccountStatement-Path"
+          }
+        ],
+        "response": []
+      },
+      {
+        "id": "flow-SadadEnquiry",
+        "name": "POST /SadadEnquiry",
+        "description": "SadadEnquiry — routes to backend /B2BService/epayments/sadadEnquiry (XML backend)",
+        "conditionMode": "simple",
+        "pathValue": "/SadadEnquiry",
+        "pathOperator": "MatchesPath",
+        "verb": "POST",
+        "condition": "(proxy.pathsuffix MatchesPath \"/SadadEnquiry\") and (request.verb = \"POST\")",
+        "request": [
+          {
+            "policyName": "RF-EmptyRequestBody",
+            "condition": "request.content = null or request.content = \"\""
+          },
+          {
+            "policyName": "J2X-RequestBody"
+          },
+          {
+            "policyName": "AM-Set-SadadEnquiry-Path"
+          }
+        ],
+        "response": []
+      },
+      {
+        "id": "flow-VABulkPaymentEnquiry",
+        "name": "POST /VABulkPaymentEnquiry",
+        "description": "VABulkPaymentEnquiry — routes to backend /VARESTService/VABulkPayment/file-payment/searchByClientId (JSON backend)",
+        "conditionMode": "simple",
+        "pathValue": "/VABulkPaymentEnquiry",
+        "pathOperator": "MatchesPath",
+        "verb": "POST",
+        "condition": "(proxy.pathsuffix MatchesPath \"/VABulkPaymentEnquiry\") and (request.verb = \"POST\")",
+        "request": [
+          {
+            "policyName": "RF-EmptyRequestBody",
+            "condition": "request.content = null or request.content = \"\""
+          },
+          {
+            "policyName": "AM-Set-VABulkPaymentEnquiry-Path"
+          }
+        ],
+        "response": []
+      },
+      {
+        "id": "flow-unsupported-operation",
+        "name": "Unsupported Operation (catch-all)",
+        "description": "No conditional flow matched — unknown operation for this proxy.",
+        "conditionMode": "custom",
+        "pathValue": "",
+        "pathOperator": "MatchesPath",
+        "verb": "ANY",
+        "condition": "",
+        "request": [
+          {
+            "policyName": "RF-UnsupportedOperation"
+          }
+        ],
+        "response": []
+      }
+    ],
+    "routeRules": [
+      {
+        "id": "route-default",
+        "name": "TG-RJHI-Backend",
+        "targetName": "TG-RJHI-Backend",
+        "condition": ""
+      }
+    ],
+    "faultRules": {
+      "steps": [
+        {
+          "policyName": "RF-MalformedPayload",
+          "condition": "fault.name = \"InvalidJSON\" or fault.name = \"ExecutionFailed\""
+        },
+        {
+          "policyName": "FC-ErrorHandling",
+          "condition": "!(error.message = \"Received non success response code\" OR fault.name Matches \"RaiseFault\")"
+        }
+      ]
+    },
+    "lintExcludes": [],
+    "environments": [],
+    "createdAt": 1787217464830,
+    "updatedAt": 1787223743764,
+    "tests": []
+  }
+}

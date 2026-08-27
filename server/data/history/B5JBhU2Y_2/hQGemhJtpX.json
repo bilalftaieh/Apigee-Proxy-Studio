@@ -1,0 +1,201 @@
+{
+  "id": "hQGemhJtpX",
+  "savedAt": 1787484329059,
+  "proxy": {
+    "name": "infath-out-bog-tanfeeth",
+    "basePath": "/bog-tanfeeth/v1",
+    "description": "Routes to different backend paths on a shared Target Server based on the incoming path, gated by a shared OAuth flow, with a service-unavailable fallback.",
+    "proxyEndpointName": "default",
+    "policies": [
+      {
+        "id": "FC-OAuth",
+        "name": "FC-OAuth",
+        "type": "FlowCallout",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<FlowCallout continueOnError=\"false\" enabled=\"true\" name=\"FC-OAuth\">\n    <DisplayName>FC-OAuth</DisplayName>\n    <SharedFlowBundle>SF-OAuth</SharedFlowBundle>\n</FlowCallout>"
+      },
+      {
+        "id": "AM-SetPath-ServiceA",
+        "name": "AM-SetGetLookUpURL",
+        "type": "AssignMessage",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<AssignMessage continueOnError=\"false\" enabled=\"true\" name=\"AM-SetGetLookUpURL\">\n    <DisplayName>AM-SetGetLookUpURL</DisplayName>\n    <AssignVariable>\n        <Name>CompletePathUrl</Name>\n        <Template>/TanfeethInteg/1.0/api/Lookup/{lookup.typeNormalized}</Template>\n    </AssignVariable>\n    <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>\n</AssignMessage>"
+      },
+      {
+        "id": "AM-SetPath-ServiceB",
+        "name": "AM-SetPath-ServiceB",
+        "type": "AssignMessage",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<AssignMessage continueOnError=\"false\" enabled=\"true\" name=\"AM-SetPath-ServiceB\">\n    <DisplayName>AM-SetPath-ServiceB</DisplayName>\n    <AssignVariable>\n        <Name>CompletePathUrl</Name>\n        <Value>/service-b/v1</Value>\n    </AssignVariable>\n    <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>\n</AssignMessage>"
+      },
+      {
+        "id": "FC-ServiceUnavailable",
+        "name": "FC-ServiceUnavailable",
+        "type": "FlowCallout",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<FlowCallout continueOnError=\"false\" enabled=\"true\" name=\"FC-ServiceUnavailable\">\n    <DisplayName>FC-ServiceUnavailable</DisplayName>\n    <SharedFlowBundle>SF-generalErrorHandling</SharedFlowBundle>\n</FlowCallout>"
+      },
+      {
+        "id": "oFGe3oiMsD",
+        "name": "AM-Set-PathSuffix-url",
+        "type": "AssignMessage",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<AssignMessage continueOnError=\"false\" enabled=\"true\" name=\"AM-Set-PathSuffix-url\">\n    <DisplayName>AM-Set-PathSuffix-url</DisplayName>\n    <AssignVariable>\n        <Name>target.copy.pathsuffix</Name>\n        <Value>false</Value>\n    </AssignVariable>\n    <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>\n</AssignMessage>"
+      },
+      {
+        "id": "Z8tNeGjteQ",
+        "name": "EV-LookupType",
+        "type": "ExtractVariables",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<ExtractVariables continueOnError=\"false\" enabled=\"true\" name=\"EV-LookupType\">\n    <DisplayName>EV-LookupType</DisplayName>\n    <Source clearPayload=\"false\">request</Source>\n    <URIPath>\n        <Pattern ignoreCase=\"true\">/GetLookup/{lookupType}</Pattern>\n    </URIPath>\n    <VariablePrefix>lookup</VariablePrefix>\n    <IgnoreUnresolvedVariables>false</IgnoreUnresolvedVariables>\n</ExtractVariables>"
+      },
+      {
+        "id": "Oepu3TS4RK",
+        "name": "AM-LookupWhitelist",
+        "type": "AssignMessage",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<AssignMessage continueOnError=\"false\" enabled=\"true\" name=\"AM-LookupWhitelist\">\n    <DisplayName>AM-LookupWhitelist</DisplayName>\n    <AssignVariable>\n        <Name>lookup.allowedTypes</Name>\n        <Value>|Cities|Countries|Courts|EnforcementTypes|ExecutionClaimResults|ExecutionRequestStatus|IdentityTypes|LicenseSources|Agencies|</Value>\n    </AssignVariable>\n    <AssignVariable>\n        <Name>lookup.typeNormalized</Name>\n        <Ref>lookup.lookupType</Ref>\n        <Value>NONE</Value>\n    </AssignVariable>\n    <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>\n</AssignMessage>"
+      },
+      {
+        "id": "WUutTTT8PS",
+        "name": "RF-InvalidLookupType",
+        "type": "RaiseFault",
+        "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<RaiseFault continueOnError=\"false\" enabled=\"true\" name=\"RF-InvalidLookupType\">\n    <DisplayName>RF-InvalidLookupType</DisplayName>\n    <FaultResponse>\n        <Set>\n            <StatusCode>400</StatusCode>\n            <ReasonPhrase>Bad Request</ReasonPhrase>\n            <Headers>\n                <Header name=\"Content-Type\">application/json</Header>\n            </Headers>\n            <Payload contentType=\"application/json\">{\n                \"error\": {\n                    \"code\": \"INVALID_LOOKUP_TYPE\",\n                    \"message\": \"Unsupported lookup type: '{lookup.typeNormalized}'\",\n                    \"allowed\": \"{lookup.allowedTypes}\"\n                }\n                }\n            </Payload>\n        </Set>\n    </FaultResponse>\n    <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>\n</RaiseFault>"
+      }
+    ],
+    "targets": [
+      {
+        "id": "default",
+        "name": "Bog-Tanfeeth-Server",
+        "description": "Path is resolved from CompletePathUrl, set by whichever conditional flow matched.",
+        "mode": "targetServer",
+        "url": {
+          "mode": "literal",
+          "value": ""
+        },
+        "targetServers": [
+          "Bog-Tanfeeth-Server"
+        ],
+        "path": {
+          "mode": "variable",
+          "value": "CompletePathUrl"
+        },
+        "preFlow": {
+          "request": [
+            {
+              "policyName": "AM-Set-PathSuffix-url"
+            }
+          ],
+          "response": []
+        },
+        "postFlow": {
+          "request": [],
+          "response": []
+        },
+        "flows": [],
+        "faultRules": {
+          "steps": []
+        },
+        "sslInfo": {
+          "enabled": false,
+          "clientAuthEnabled": false,
+          "keyStore": "",
+          "keyAlias": "",
+          "trustStore": "",
+          "ignoreValidationErrors": false
+        }
+      }
+    ],
+    "preFlow": {
+      "request": [
+        {
+          "policyName": "FC-OAuth"
+        }
+      ],
+      "response": []
+    },
+    "postFlow": {
+      "request": [],
+      "response": []
+    },
+    "flows": [
+      {
+        "id": "flow-service-a",
+        "name": "GetLookUp",
+        "description": "Routes /service-a/* requests — sets CompletePathUrl before the TargetEndpoint runs.",
+        "conditionMode": "simple",
+        "pathValue": "/GetLookUp/**",
+        "pathOperator": "MatchesPath",
+        "verb": "GET",
+        "condition": "(proxy.pathsuffix MatchesPath \"/GetLookUp/**\") and (request.verb = \"GET\")",
+        "request": [
+          {
+            "policyName": "EV-LookupType"
+          },
+          {
+            "policyName": "AM-LookupWhitelist"
+          },
+          {
+            "policyName": "RF-InvalidLookupType",
+            "condition": "NOT (lookup.allowedTypes ~~ \"(?i).*\\|\\Q{lookup.typeNormalized}\\E\\|.*\")"
+          },
+          {
+            "policyName": "AM-SetGetLookUpURL"
+          }
+        ],
+        "response": [],
+        "enabled": true
+      },
+      {
+        "id": "flow-service-b",
+        "name": "Service B",
+        "description": "Routes /service-b/* requests — sets CompletePathUrl before the TargetEndpoint runs.",
+        "conditionMode": "simple",
+        "pathValue": "/service-b/*",
+        "pathOperator": "MatchesPath",
+        "verb": "ANY",
+        "condition": "proxy.pathsuffix MatchesPath \"/service-b/*\"",
+        "request": [
+          {
+            "policyName": "AM-SetPath-ServiceB"
+          }
+        ],
+        "response": [],
+        "enabled": true
+      },
+      {
+        "id": "flow-default-unavailable",
+        "name": "Default - Service Unavailable",
+        "description": "No condition — must stay last so it only catches requests that matched none of the routes above.",
+        "conditionMode": "simple",
+        "pathValue": "",
+        "pathOperator": "MatchesPath",
+        "verb": "ANY",
+        "condition": "",
+        "request": [
+          {
+            "policyName": "FC-ServiceUnavailable"
+          }
+        ],
+        "response": [],
+        "enabled": true
+      }
+    ],
+    "routeRules": [
+      {
+        "id": "kInLQOPhO8",
+        "name": "Bog-Tanfeeth-Server",
+        "targetName": "Bog-Tanfeeth-Server",
+        "condition": "",
+        "mode": "target",
+        "url": ""
+      }
+    ],
+    "faultRules": {
+      "steps": []
+    },
+    "id": "B5JBhU2Y_2",
+    "createdAt": 1787481915644,
+    "updatedAt": 1787484221468,
+    "postClientFlow": {
+      "response": []
+    },
+    "resources": [],
+    "lintExcludes": [],
+    "environments": [],
+    "tests": []
+  }
+}

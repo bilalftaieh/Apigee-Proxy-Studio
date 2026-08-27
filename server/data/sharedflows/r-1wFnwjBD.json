@@ -1,0 +1,21 @@
+{
+  "id": "r-1wFnwjBD",
+  "name": "SF-Service-Unavailable",
+  "description": "",
+  "policies": [
+    {
+      "id": "Zs9JF97jI5",
+      "name": "RF-Service-Not-Available",
+      "type": "RaiseFault",
+      "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<RaiseFault async=\"false\" continueOnError=\"false\" enabled=\"true\" name=\"RF-Service-Not-Available\">\n    <DisplayName>RF-Service-Not-Available</DisplayName>\n    <FaultResponse>\n    <Set>\n      <Payload contentType=\"application/json\" variablePrefix=\"@\" variableSuffix=\"#\">\n                {\n    \"Error\": \"Infath service resource is unavailable\",\n    \"ServicePath\": \"@proxy.basepath#@proxy.pathsuffix#\",\n    \"host\": \"@request.header.Host#\",\n    \"apigeeDetails\": {\n        <!-- \"organization\": \"@organization.name#\", -->\n        \"environment\": \"@environment.name#\",\n        \"proxy\": \"@apiproxy.name#\",\n        \"revision\": \"@apiproxy.revision#\"\n    },\n    \"message\": \"Please verify the requested service path or contact Infath support\"\n}\n            </Payload>\n      <StatusCode>404</StatusCode>\n      <ReasonPhrase>Resource Not Avialable</ReasonPhrase>\n    </Set>\n  </FaultResponse>\n  <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>\n</RaiseFault>"
+    }
+  ],
+  "steps": [
+    {
+      "policyName": "RF-Service-Not-Available"
+    }
+  ],
+  "lintExcludes": [],
+  "createdAt": 1786962821312,
+  "updatedAt": 1786962873587
+}

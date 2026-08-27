@@ -1,0 +1,24 @@
+{
+  "name": "apigee-proxy-studio",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Local Apigee X proxy bundle builder — design proxies, policies and conditional flows, export ready-to-import apiproxy zip bundles.",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "free-ports": "powershell -ExecutionPolicy Bypass -File scripts/free-ports.ps1",
+    "predev": "npm run free-ports",
+    "dev": "concurrently -n SERVER,CLIENT -c yellow,cyan \"node --watch server/src/index.js\" \"node node_modules/vite/bin/vite.js client\"",
+    "dev:server": "node --watch server/src/index.js",
+    "dev:client": "node node_modules/vite/bin/vite.js client",
+    "install:all": "npm install",
+    "lint:templates": "node scripts/lint-policy-templates.mjs",
+    "test:roundtrip": "node scripts/roundtrip.mjs",
+    "build": "npm run build -w client"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
