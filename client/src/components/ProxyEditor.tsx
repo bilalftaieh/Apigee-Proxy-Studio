@@ -16,16 +16,35 @@ import { SaveAsTemplateModal } from './SaveAsTemplateModal';
 import { HistoryModal } from './HistoryModal';
 import { DriftCompareModal } from './DriftCompareModal';
 
-const TABS: { key: TabKey; label: string; icon: string }[] = [
-  { key: 'overview', label: 'Overview', icon: 'layout-dashboard' },
-  { key: 'proxyEndpoint', label: 'Proxy Endpoint', icon: 'signpost' },
-  { key: 'targetEndpoint', label: 'Target Endpoint', icon: 'server' },
-  { key: 'flowDiagram', label: 'Flow Diagram', icon: 'workflow' },
-  { key: 'policies', label: 'Policies', icon: 'shield' },
-  { key: 'resources', label: 'Resources', icon: 'folder-code' },
-  { key: 'tests', label: 'Test', icon: 'flask-conical' },
-  { key: 'lint', label: 'Lint', icon: 'scan-line' },
-  { key: 'preview', label: 'XML Preview', icon: 'file-code' },
+/**
+ * Nine destinations in one undifferentiated row, mixing two different jobs:
+ * authoring the bundle, and checking what the bundle does. Apigee's own console
+ * draws the same line between Develop and Trace/Debug, so the row does too —
+ * one flat tablist still, just segmented, so nothing moved behind a click.
+ *
+ * Tab order within each group follows the request's own path: endpoint in,
+ * target out, then the policies and files attached along the way.
+ */
+const TAB_GROUPS: { group: string; tabs: { key: TabKey; label: string; icon: string }[] }[] = [
+  {
+    group: 'Design',
+    tabs: [
+      { key: 'overview', label: 'Overview', icon: 'layout-dashboard' },
+      { key: 'proxyEndpoint', label: 'Proxy Endpoint', icon: 'signpost' },
+      { key: 'targetEndpoint', label: 'Target Endpoint', icon: 'server' },
+      { key: 'policies', label: 'Policies', icon: 'shield' },
+      { key: 'resources', label: 'Resources', icon: 'folder-code' },
+    ],
+  },
+  {
+    group: 'Verify',
+    tabs: [
+      { key: 'flowDiagram', label: 'Flow Diagram', icon: 'workflow' },
+      { key: 'tests', label: 'Test', icon: 'flask-conical' },
+      { key: 'lint', label: 'Lint', icon: 'scan-line' },
+      { key: 'preview', label: 'XML Preview', icon: 'file-code' },
+    ],
+  },
 ];
 
 export function ProxyEditor() {
@@ -116,7 +135,11 @@ export function ProxyEditor() {
         </div>
 
         <TabBar activeKey={activeTab}>
-          {TABS.map((t) => (
+          {TAB_GROUPS.flatMap((g, groupIndex) => [
+            <span key={`g-${g.group}`} className="tab-group-label" aria-hidden="true" data-first={groupIndex === 0 || undefined}>
+              {g.group}
+            </span>,
+            ...g.tabs.map((t) => (
             <button
               key={t.key}
               type="button"
@@ -148,7 +171,8 @@ export function ProxyEditor() {
                 </span>
               )}
             </button>
-          ))}
+            )),
+          ])}
         </TabBar>
       </div>
 

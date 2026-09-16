@@ -2,15 +2,19 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Editor, { type Monaco, type OnMount } from '@monaco-editor/react';
 import type { editor as MonacoEditorNs } from 'monaco-editor';
 import { useStore } from '../../store/useStore';
+import { api } from '../../api/client';
 import { Icon } from '../Icon';
 import { AddPolicyModal } from '../AddPolicyModal';
+import { AiPolicyModal } from '../AiPolicyModal';
 import { ConfirmModal } from '../ConfirmModal';
 import { FlowCalloutHelper } from '../FlowCalloutHelper';
 import { PolicyVisualEditor } from '../PolicyVisualEditor';
 import { setupApigeeMonaco } from '../../lib/monacoApigee';
 import { getPolicySchema } from '../../lib/policySchema';
 import { lintPolicyXml } from '../../lib/fastLint';
+import { EDITOR_OPTIONS, attachLayoutFallback } from '../../lib/monacoLayout';
 import { policyReferencesResource, resourceUri } from '../../lib/resourceTypes';
+import { buildPolicyAttachments, GROUP_LABELS, GROUP_ORDER, type AttachmentGroup } from '../../lib/policyAttachment';
 
 export function PoliciesTab() {
   const proxy = useStore((s) => s.currentProxy)!;
@@ -26,14 +30,65 @@ export function PoliciesTab() {
   const duplicatePolicy = useStore((s) => s.duplicatePolicy);
 
   const [showAdd, setShowAdd] = useState(false);
+  const [showAi, setShowAi] = useState(false);
+  // Null until the status call lands, so the button doesn't flicker in and then
+  // out again on a workspace where AI isn't configured.
+  const [aiReady, setAiReady] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (proxy.aiDisabled) {
+      setAiReady(false);
+      return;
+    }
+    let cancelled = false;
+    api
+      .aiStatus()
+      .then((s) => !cancelled && setAiReady(s.configured))
+      .catch(() => !cancelled && setAiReady(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [proxy.aiDisabled]);
   const [toDelete, setToDelete] = useState<{ id: string; name: string } | null>(null);
   const [editorView, setEditorView] = useState<'visual' | 'xml'>('xml');
+  const [filter, setFilter] = useState('');
 
   const editorRef = useRef<MonacoEditorNs.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
 
   const selected = proxy.policies.find((p) => p.id === selectedPolicyId) || proxy.policies[0];
   const schema = selected ? getPolicySchema(selected.type) : undefined;
+
+  // Where each policy is attached — the thing the list used to leave out. See
+  // lib/policyAttachment.ts for why it matters.
+  const attachments = useMemo(() => buildPolicyAttachments(proxy), [proxy]);
+
+  /**
+   * The list, bucketed by attachment and filtered. The filter matches the
+   * policy's name, its type label and its category, so the colour of the dot —
+   * which encodes category and nothing else says so — is reachable as text.
+   */
+  const groupedPolicies = useMemo(() => {
+    const needle = filter.trim().toLowerCase();
+    const buckets = new Map<AttachmentGroup, typeof proxy.policies>();
+
+    for (const policy of proxy.policies) {
+      const type = policyTypes.find((t) => t.key === policy.type);
+      if (needle) {
+        const haystack = `${policy.name} ${type?.label ?? policy.type} ${type?.category ?? ''}`.toLowerCase();
+        if (!haystack.includes(needle)) continue;
+      }
+      const group = attachments.get(policy.name)?.group ?? 'unattached';
+      const bucket = buckets.get(group);
+      if (bucket) bucket.push(policy);
+      else buckets.set(group, [policy]);
+    }
+
+    return GROUP_ORDER.filter((g) => buckets.has(g)).map((g) => ({ group: g, policies: buckets.get(g)! }));
+  }, [proxy.policies, policyTypes, attachments, filter]);
+
+  const matchCount = groupedPolicies.reduce((n, g) => n + g.policies.length, 0);
+  const unattachedCount = proxy.policies.filter((p) => attachments.get(p.name)?.group === 'unattached').length;
 
   useEffect(() => {
     setEditorView(selected && getPolicySchema(selected.type) ? 'visual' : 'xml');
@@ -58,6 +113,9 @@ export function PoliciesTab() {
   const handleXmlEditorMount: OnMount = (editorInstance, monacoInstance) => {
     editorRef.current = editorInstance;
     monacoRef.current = monacoInstance;
+    // No teardown to track here: the fallback detaches itself when this editor
+    // is disposed, which is what @monaco-editor/react does on unmount.
+    attachLayoutFallback(editorInstance);
   };
 
   // The raw XML Monaco editor unmounts (and disposes) whenever the Visual or
@@ -98,11 +156,19 @@ export function PoliciesTab() {
           <p className="card-subtitle" style={{ margin: '0 0 18px' }}>
             Policies implement security, traffic management and mediation logic. Attach one to get started.
           </p>
-          <button className="btn btn-primary" style={{ margin: '0 auto' }} onClick={() => setShowAdd(true)}>
-            <Icon name="plus" size={14} /> Add Policy
-          </button>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+            <button className="btn btn-primary" onClick={() => setShowAdd(true)}>
+              <Icon name="plus" size={14} /> Add Policy
+            </button>
+            {aiReady && (
+              <button className="btn btn-ghost" onClick={() => setShowAi(true)}>
+                <Icon name="sparkles" size={14} /> Generate with AI
+              </button>
+            )}
+          </div>
         </div>
         {showAdd && <AddPolicyModal onClose={() => setShowAdd(false)} policies={proxy.policies} resources={proxy.resources} onAdd={addPolicy} allowChains />}
+        {showAi && <AiPolicyModal onClose={() => setShowAi(false)} />}
       </>
     );
   }
@@ -110,47 +176,111 @@ export function PoliciesTab() {
   return (
     <div className="policies-layout">
       <div className="policy-list-col">
-        <button className="btn btn-primary btn-sm" style={{ width: '100%', marginBottom: 12, flexShrink: 0 }} onClick={() => setShowAdd(true)}>
+        <button className="btn btn-primary btn-sm" style={{ width: '100%', marginBottom: aiReady ? 6 : 12, flexShrink: 0 }} onClick={() => setShowAdd(true)}>
           <Icon name="plus" size={13} /> Add Policy
         </button>
+        {aiReady && (
+          <button className="btn btn-ghost btn-sm" style={{ width: '100%', marginBottom: 12, flexShrink: 0 }} onClick={() => setShowAi(true)}>
+            <Icon name="sparkles" size={13} /> Generate with AI
+          </button>
+        )}
+        {/* Worth the row once a proxy has more than a handful of policies —
+            the real ones here run to 27, which is a long scroll to eyeball. */}
+        {proxy.policies.length > 6 && (
+          <div className="policy-filter">
+            <Icon name="search" size={13} />
+            <input
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="Filter policies…"
+              aria-label="Filter policies by name, type or category"
+            />
+            {filter && (
+              <button className="icon-btn" onClick={() => setFilter('')} aria-label="Clear filter" title="Clear">
+                <Icon name="x" size={13} />
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* A count, not a control — the policies it refers to are already in
+            the list, in their own group at the bottom. */}
+        {unattachedCount > 0 && !filter && (
+          <div className="policy-unattached-hint">
+            <Icon name="alert-triangle" size={12} />
+            <span>
+              {unattachedCount} polic{unattachedCount === 1 ? 'y' : 'ies'} attached to no flow — shipped, never run
+            </span>
+          </div>
+        )}
+
         <div className="policy-list">
-          {proxy.policies.map((p) => {
-            const type = policyTypes.find((t) => t.key === p.type);
-            return (
-              <div
-                key={p.id}
-                className={`policy-list-item ${selected?.id === p.id ? 'active' : ''}`}
-                onClick={() => setSelectedPolicyId(p.id)}
-              >
-                <span className="policy-dot" style={{ background: type?.accent || '#8b93a7' }} />
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div className="policy-list-item-name mono">{p.name}</div>
-                  <div className="policy-list-item-type">{type?.label || p.type}</div>
-                </div>
-                <button
-                  className="icon-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    duplicatePolicy(p.id);
-                  }}
-                  aria-label="Duplicate policy"
-                  title="Duplicate"
-                >
-                  <Icon name="copy" size={13} />
-                </button>
-                <button
-                  className="icon-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setToDelete({ id: p.id, name: p.name });
-                  }}
-                  aria-label="Delete policy"
-                >
-                  <Icon name="trash-2" size={13} />
-                </button>
+          {matchCount === 0 && <div className="empty-hint">No policies match “{filter}”.</div>}
+          {groupedPolicies.map(({ group, policies }) => (
+            <div key={group} className="policy-group" data-group={group}>
+              <div className="policy-group-head">
+                <span className="policy-group-title">{GROUP_LABELS[group]}</span>
+                <span className="policy-group-count">{policies.length}</span>
               </div>
-            );
-          })}
+              {policies.map((p) => {
+                const type = policyTypes.find((t) => t.key === p.type);
+                const attachment = attachments.get(p.name);
+                const sites = attachment?.sites ?? [];
+                return (
+                  <div
+                    key={p.id}
+                    className={`policy-list-item ${selected?.id === p.id ? 'active' : ''}`}
+                    onClick={() => setSelectedPolicyId(p.id)}
+                  >
+                    {/* The colour encodes category and always has; naming it
+                        here is what stops the colour being the only carrier. */}
+                    <span
+                      className="policy-dot"
+                      style={{ background: type?.accent || '#8b93a7' }}
+                      title={type?.category ? `${type.category} policy` : undefined}
+                    />
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div className="policy-list-item-name mono">{p.name}</div>
+                      <div className="policy-list-item-type">
+                        {type?.label || p.type}
+                        {sites.length > 0 && (
+                          <>
+                            {' · '}
+                            <span className="policy-list-item-site" title={sites.map((site) => site.where).join(', ')}>
+                              {sites[0].where}
+                              {sites.length > 1 && ` +${sites.length - 1}`}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      className="icon-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        duplicatePolicy(p.id);
+                      }}
+                      aria-label={`Duplicate policy ${p.name}`}
+                      title="Duplicate"
+                    >
+                      <Icon name="copy" size={13} />
+                    </button>
+                    <button
+                      className="icon-btn icon-btn-danger"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setToDelete({ id: p.id, name: p.name });
+                      }}
+                      aria-label={`Delete policy ${p.name}`}
+                      title="Delete"
+                    >
+                      <Icon name="trash-2" size={13} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         </div>
       </div>
 
@@ -230,15 +360,7 @@ export function PoliciesTab() {
                   value={selected.xml}
                   onChange={(value) => updatePolicyXml(selected.id, value || '')}
                   onMount={handleXmlEditorMount}
-                  options={{
-                    fontSize: 13,
-                    fontFamily: 'JetBrains Mono, monospace',
-                    minimap: { enabled: false },
-                    scrollBeyondLastLine: false,
-                    automaticLayout: true,
-                    padding: { top: 14 },
-                    renderLineHighlight: 'none',
-                  }}
+                  options={EDITOR_OPTIONS}
                 />
             </div>
           )}
@@ -246,6 +368,7 @@ export function PoliciesTab() {
       )}
 
       {showAdd && <AddPolicyModal onClose={() => setShowAdd(false)} policies={proxy.policies} resources={proxy.resources} onAdd={addPolicy} allowChains />}
+      {showAi && <AiPolicyModal onClose={() => setShowAi(false)} />}
       {toDelete && (
         <ConfirmModal
           title="Delete policy?"

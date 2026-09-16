@@ -521,10 +521,42 @@
 
 .tabs {
   display: flex;
+  align-items: center;
   gap: 4px;
   overflow-x: auto;
   overflow-y: hidden;
   scroll-behavior: smooth;
+}
+
+/* Segments the row into Design and Verify. aria-hidden and not focusable: the
+   tablist's semantics are unchanged, this only tells the eye which half of the
+   row it is looking at. The rule on the left is the divider between groups, so
+   the first label doesn't get one. */
+.tab-group-label {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 9px 0 0;
+  margin-right: 3px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  user-select: none;
+}
+.tab-group-label::before {
+  content: '';
+  width: 1px;
+  height: 18px;
+  background: var(--border-strong);
+}
+.tab-group-label[data-first] {
+  padding-left: 0;
+}
+.tab-group-label[data-first]::before {
+  display: none;
 }
 
 .tabs-wrap[data-edge-right] .tabs {
@@ -587,7 +619,11 @@
   flex: 0 0 auto;
   white-space: nowrap;
   padding: 10px 4px;
-  margin-right: 22px;
+  /* Was 22px, for a row with nothing else in it to group by. The group labels
+     now carry the separation, so the per-tab gap pays for them — nine tabs at
+     12px less each more than covers the ~110px the two labels cost, which
+     keeps the row from overflowing any sooner than it did before. */
+  margin-right: 10px;
   font-family: inherit;
   font-size: 13px;
   font-weight: 600;
@@ -1150,6 +1186,57 @@
   min-height: 0;
 }
 
+/* Filter for the policy list. Narrower than the sidebar's search box and sized
+   to sit inside a 260px column, so it doesn't reuse .search-box. */
+.policy-filter {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  margin-bottom: 8px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-1);
+  color: var(--text-3);
+}
+.policy-filter:focus-within {
+  border-color: var(--accent-blue);
+}
+.policy-filter input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 0;
+  border: none;
+  background: none;
+  outline: none;
+  font-size: 12px;
+  color: var(--text-0);
+}
+.policy-filter input::placeholder {
+  color: var(--text-3);
+}
+
+/* Unattached policies still export and still show in this list; they just never
+   execute. The count says so before you scroll to the group at the bottom. */
+.policy-unattached-hint {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  margin-bottom: 10px;
+  padding: 7px 9px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 180, 84, 0.3);
+  background: rgba(255, 180, 84, 0.08);
+  color: var(--warning);
+  font-size: 11px;
+  line-height: 1.35;
+}
+.policy-unattached-hint svg {
+  flex-shrink: 0;
+}
+
 .policy-list {
   display: flex;
   flex-direction: column;
@@ -1159,6 +1246,60 @@
   overflow-y: auto;
   padding-right: 4px;
   margin-right: -4px;
+}
+
+/* The list is bucketed by where a policy is attached, in the order a request
+   passes through: proxy request, target request, target response, proxy
+   response, fault handling, then anything attached nowhere. */
+.policy-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.policy-group + .policy-group {
+  margin-top: 12px;
+}
+
+.policy-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 2px 2px;
+  /* The list scrolls and the groups are what tells you where you are in it, so
+     the header has to survive the scroll. */
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-0);
+}
+
+.policy-group-title {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.policy-group-count {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--text-3);
+  background: var(--bg-2);
+  border-radius: 999px;
+  padding: 1px 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.policy-group[data-group='unattached'] .policy-group-title {
+  color: var(--warning);
+}
+.policy-group[data-group='unattached'] .policy-list-item {
+  border-color: rgba(255, 180, 84, 0.28);
 }
 
 .policy-list-item {
@@ -1197,6 +1338,16 @@
 .policy-list-item-type {
   font-size: 10px;
   color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The flow the policy is attached to, appended to its type. Brighter than the
+   type because it is the part that differs between two policies of the same
+   kind. */
+.policy-list-item-site {
+  color: var(--text-2);
 }
 
 .policy-editor {

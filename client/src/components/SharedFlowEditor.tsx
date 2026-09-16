@@ -7,12 +7,26 @@ import { SharedFlowResourcesPanel } from './sharedFlowTabs/SharedFlowResourcesPa
 import { SharedFlowLintPanel } from './sharedFlowTabs/SharedFlowLintPanel';
 import { SharedFlowPreviewPanel } from './sharedFlowTabs/SharedFlowPreviewPanel';
 
-const TABS: { key: SharedFlowTabKey; label: string; icon: string }[] = [
-  { key: 'steps', label: 'Steps', icon: 'list-ordered' },
-  { key: 'policies', label: 'Policies', icon: 'shield' },
-  { key: 'resources', label: 'Resources', icon: 'folder-code' },
-  { key: 'lint', label: 'Lint', icon: 'scan-line' },
-  { key: 'preview', label: 'XML Preview', icon: 'file-code' },
+/** Same Design / Verify split as the proxy editor — see TAB_GROUPS there. Five
+ *  tabs fit without segmenting, but the two editors sit behind the same sidebar
+ *  and a row that reorganises itself depending on which one is open is worse
+ *  than a row that is slightly over-structured. */
+const TAB_GROUPS: { group: string; tabs: { key: SharedFlowTabKey; label: string; icon: string }[] }[] = [
+  {
+    group: 'Design',
+    tabs: [
+      { key: 'steps', label: 'Steps', icon: 'list-ordered' },
+      { key: 'policies', label: 'Policies', icon: 'shield' },
+      { key: 'resources', label: 'Resources', icon: 'folder-code' },
+    ],
+  },
+  {
+    group: 'Verify',
+    tabs: [
+      { key: 'lint', label: 'Lint', icon: 'scan-line' },
+      { key: 'preview', label: 'XML Preview', icon: 'file-code' },
+    ],
+  },
 ];
 
 export function SharedFlowEditor() {
@@ -88,7 +102,11 @@ export function SharedFlowEditor() {
         </div>
 
         <TabBar activeKey={activeTab}>
-          {TABS.map((t) => (
+          {TAB_GROUPS.flatMap((g, groupIndex) => [
+            <span key={`g-${g.group}`} className="tab-group-label" aria-hidden="true" data-first={groupIndex === 0 || undefined}>
+              {g.group}
+            </span>,
+            ...g.tabs.map((t) => (
             <button
               key={t.key}
               type="button"
@@ -117,7 +135,8 @@ export function SharedFlowEditor() {
                 </span>
               )}
             </button>
-          ))}
+            )),
+          ])}
         </TabBar>
       </div>
 
