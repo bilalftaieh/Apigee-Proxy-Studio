@@ -9,6 +9,7 @@ import { ProxyEditor } from './components/ProxyEditor';
 import { SharedFlowEditor } from './components/SharedFlowEditor';
 import { WorkspaceView } from './components/WorkspaceView';
 import { CommandPalette } from './components/CommandPalette';
+import { LogConsole } from './components/LogConsole';
 import { useUiStore } from './store/useUiStore';
 import { useWorkspaceStore } from './store/useWorkspaceStore';
 
@@ -39,6 +40,21 @@ export default function App() {
     refreshSharedFlows();
   }, [bootstrap, refreshSharedFlows]);
 
+  // Backstop for async failures no call site caught. Every one of those used to
+  // land in the console and nowhere else, so the UI's answer to a failed
+  // request was to do nothing at all — indistinguishable from a dead click.
+  // Store actions that already report their own errors never reach here,
+  // because a caught rejection isn't an unhandled one.
+  useEffect(() => {
+    const onRejection = (e: PromiseRejectionEvent) => {
+      const reason = e.reason;
+      const message = reason instanceof Error ? reason.message : String(reason ?? 'Unknown error');
+      useStore.getState().pushToast(`Something went wrong — ${message}`, 'error');
+    };
+    window.addEventListener('unhandledrejection', onRejection);
+    return () => window.removeEventListener('unhandledrejection', onRejection);
+  }, []);
+
   // Global shortcuts. Ctrl/Cmd+K opens the command palette; Ctrl/Cmd+S saves
   // whatever is open — without the latter the browser's save-page dialog fires
   // instead, which is the last thing anyone wants mid-edit. Ctrl/Cmd+Z and
@@ -51,6 +67,14 @@ export default function App() {
       if ((e.key === 'k' || e.key === 'K') && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
         e.preventDefault();
         useUiStore.getState().toggleCommandPalette();
+        return;
+      }
+
+      // Ctrl/Cmd+` opens the log panel — the convention devtools consoles use,
+      // and a key that no text input claims.
+      if (e.key === '`' && (e.ctrlKey || e.metaKey) && !e.altKey) {
+        e.preventDefault();
+        useUiStore.getState().toggleLogConsole();
         return;
       }
 
@@ -100,6 +124,7 @@ export default function App() {
       <Toasts />
       <SuggestionBanner />
       <CommandPalette />
+      <LogConsole />
     </div>
   );
 }

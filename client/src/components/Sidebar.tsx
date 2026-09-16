@@ -9,7 +9,6 @@ import { NewSharedFlowModal } from './NewSharedFlowModal';
 import { UseTemplateModal } from './UseTemplateModal';
 import { ImportProxyModal } from './ImportProxyModal';
 import { ConfirmModal } from './ConfirmModal';
-import { clickableRowProps } from '../lib/a11y';
 import type { Template } from '../types/proxy';
 
 export function Sidebar() {
@@ -120,18 +119,21 @@ export function Sidebar() {
         {/* Above the lists on purpose: this is the only view that's about all
             of them at once, so it doesn't belong inside any one section. */}
         <div className="sidebar-section">
-          <div
-            className={`nav-item ${workspaceOpen ? 'active' : ''}`}
-            aria-current={workspaceOpen || undefined}
-            {...clickableRowProps(() => (workspaceOpen ? closeWorkspace() : openWorkspace()))}
-          >
-            <div className="nav-item-icon">
-              <Icon name="radar" size={14} />
-            </div>
-            <div className="nav-item-body">
-              <div className="nav-item-title">Workspace Audit</div>
-              <div className="nav-item-sub">Base paths, backends, shared flow usage, house rules</div>
-            </div>
+          <div className={`nav-item ${workspaceOpen ? 'active' : ''}`}>
+            <button
+              type="button"
+              className="nav-item-main"
+              aria-current={workspaceOpen || undefined}
+              onClick={() => (workspaceOpen ? closeWorkspace() : openWorkspace())}
+            >
+              <span className="nav-item-icon">
+                <Icon name="radar" size={14} />
+              </span>
+              <span className="nav-item-body">
+                <span className="nav-item-title">Workspace Audit</span>
+                <span className="nav-item-sub">Base paths, backends, shared flow usage, house rules</span>
+              </span>
+            </button>
           </div>
         </div>
 
@@ -169,40 +171,37 @@ export function Sidebar() {
           )}
 
           {filteredProxies.map((p) => (
-            <div
-              key={p.id}
-              className={`nav-item ${currentProxy?.id === p.id ? 'active' : ''}`}
-              aria-current={currentProxy?.id === p.id || undefined}
-              {...clickableRowProps(() => handleOpenProxy(p.id))}
-            >
-              <div className="nav-item-icon">
-                <Icon name="waypoints" size={14} />
-              </div>
-              <div className="nav-item-body">
-                <div className="nav-item-title">{p.name}</div>
-                <div className="nav-item-sub">
-                  {p.basePath} &middot; {p.policyCount} polic{p.policyCount === 1 ? 'y' : 'ies'}
-                </div>
-              </div>
-              <div className="nav-item-actions" style={{ display: 'flex', gap: 2 }}>
+            <div key={p.id} className={`nav-item ${currentProxy?.id === p.id ? 'active' : ''}`}>
+              <button
+                type="button"
+                className="nav-item-main"
+                aria-current={currentProxy?.id === p.id || undefined}
+                onClick={() => handleOpenProxy(p.id)}
+              >
+                <span className="nav-item-icon">
+                  <Icon name="waypoints" size={14} />
+                </span>
+                <span className="nav-item-body">
+                  <span className="nav-item-title">{p.name}</span>
+                  <span className="nav-item-sub">
+                    {p.basePath} &middot; {p.policyCount} polic{p.policyCount === 1 ? 'y' : 'ies'}
+                  </span>
+                </span>
+              </button>
+              <div className="nav-item-actions">
                 <button
                   className="icon-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    duplicateProxy(p.id);
-                  }}
-                  aria-label="Duplicate proxy"
+                  onClick={() => duplicateProxy(p.id)}
+                  aria-label={`Duplicate proxy ${p.name}`}
                   title="Duplicate"
                 >
                   <Icon name="copy" size={13} />
                 </button>
                 <button
-                  className="icon-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setProxyToDelete({ id: p.id, name: p.name });
-                  }}
-                  aria-label="Delete proxy"
+                  className="icon-btn icon-btn-danger"
+                  onClick={() => setProxyToDelete({ id: p.id, name: p.name })}
+                  aria-label={`Delete proxy ${p.name}`}
+                  title="Delete"
                 >
                   <Icon name="trash-2" size={13} />
                 </button>
@@ -243,41 +242,38 @@ export function Sidebar() {
           )}
 
           {sharedFlows.map((sf) => (
-            <div
-              key={sf.id}
-              className={`nav-item ${currentSharedFlow?.id === sf.id ? 'active' : ''}`}
-              aria-current={currentSharedFlow?.id === sf.id || undefined}
-              {...clickableRowProps(() => handleOpenSharedFlow(sf.id))}
-            >
-              <div className="nav-item-icon">
-                <Icon name="git-branch" size={14} />
-              </div>
-              <div className="nav-item-body">
-                <div className="nav-item-title">{sf.name}</div>
-                <div className="nav-item-sub">
-                  {sf.stepCount} step{sf.stepCount === 1 ? '' : 's'} &middot; {sf.policyCount} polic
-                  {sf.policyCount === 1 ? 'y' : 'ies'}
-                </div>
-              </div>
-              <div className="nav-item-actions" style={{ display: 'flex', gap: 2 }}>
+            <div key={sf.id} className={`nav-item ${currentSharedFlow?.id === sf.id ? 'active' : ''}`}>
+              <button
+                type="button"
+                className="nav-item-main"
+                aria-current={currentSharedFlow?.id === sf.id || undefined}
+                onClick={() => handleOpenSharedFlow(sf.id)}
+              >
+                <span className="nav-item-icon">
+                  <Icon name="git-branch" size={14} />
+                </span>
+                <span className="nav-item-body">
+                  <span className="nav-item-title">{sf.name}</span>
+                  <span className="nav-item-sub">
+                    {sf.stepCount} step{sf.stepCount === 1 ? '' : 's'} &middot; {sf.policyCount} polic
+                    {sf.policyCount === 1 ? 'y' : 'ies'}
+                  </span>
+                </span>
+              </button>
+              <div className="nav-item-actions">
                 <button
                   className="icon-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    duplicateSharedFlow(sf.id);
-                  }}
-                  aria-label="Duplicate shared flow"
+                  onClick={() => duplicateSharedFlow(sf.id)}
+                  aria-label={`Duplicate shared flow ${sf.name}`}
                   title="Duplicate"
                 >
                   <Icon name="copy" size={13} />
                 </button>
                 <button
-                  className="icon-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSharedFlowToDelete({ id: sf.id, name: sf.name });
-                  }}
-                  aria-label="Delete shared flow"
+                  className="icon-btn icon-btn-danger"
+                  onClick={() => setSharedFlowToDelete({ id: sf.id, name: sf.name })}
+                  aria-label={`Delete shared flow ${sf.name}`}
+                  title="Delete"
                 >
                   <Icon name="trash-2" size={13} />
                 </button>
@@ -291,25 +287,27 @@ export function Sidebar() {
             <span className="sidebar-section-title">Templates ({templates.length})</span>
           </div>
           {templates.map((t) => (
-            <div key={t.id} className="nav-item" {...clickableRowProps(() => setTemplateToUse(t))}>
-              <div className="nav-item-icon">
-                <Icon name="layout-template" size={14} />
-              </div>
-              <div className="nav-item-body">
-                <div className="nav-item-title">{t.name}</div>
-                <div className="nav-item-sub">{t.description}</div>
-              </div>
-              <div className="nav-item-actions" style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <div key={t.id} className="nav-item">
+              <button type="button" className="nav-item-main" onClick={() => setTemplateToUse(t)}>
+                <span className="nav-item-icon">
+                  <Icon name="layout-template" size={14} />
+                </span>
+                <span className="nav-item-body">
+                  <span className="nav-item-title">{t.name}</span>
+                  <span className="nav-item-sub">{t.description}</span>
+                </span>
+              </button>
+              {/* A label rather than an action, so unlike the delete button it
+                  stays visible instead of waiting for hover. */}
+              <div className="nav-item-actions" data-always-visible={t.builtIn || undefined}>
                 {t.builtIn ? (
                   <span className="template-badge">Built-in</span>
                 ) : (
                   <button
-                    className="icon-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setTemplateToDelete(t);
-                    }}
-                    aria-label="Delete template"
+                    className="icon-btn icon-btn-danger"
+                    onClick={() => setTemplateToDelete(t)}
+                    aria-label={`Delete template ${t.name}`}
+                    title="Delete"
                   >
                     <Icon name="trash-2" size={13} />
                   </button>

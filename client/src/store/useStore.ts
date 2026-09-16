@@ -13,7 +13,9 @@ import {
 import { suggestPolicyName } from '../lib/policyNames';
 import { getPolicySuggestions, type PolicySuggestion } from '../lib/policySuggestions';
 import { createUndoHistory, type UndoSlice } from './undoHistory';
+import { createLogger } from '../lib/log/logger';
 import type {
+  AiReviewResult,
   BundleResource,
   EnvironmentTargetOverride,
   FaultRule,
@@ -36,6 +38,8 @@ import type {
   TestCase,
   TestRunResult,
 } from '../types/proxy';
+
+const logToast = createLogger('toast');
 
 /**
  * How a newly added policy gets the resource file it runs: reuse a file already
@@ -78,6 +82,13 @@ interface StoreState extends UndoSlice {
   toasts: Toast[];
   suggestion: PolicySuggestion[];
   lintResult: LintResult | null;
+  /**
+   * The AI design review, kept apart from `lintResult` on purpose. It is
+   * advisory: it must never reach errorCount, and therefore must never reach
+   * the zero-errors export gate.
+   */
+  aiReview: AiReviewResult | null;
+  reviewing: boolean;
   linting: boolean;
   prerequisites: Prerequisite[] | null;
   prerequisitesLoading: boolean;
@@ -123,6 +134,7 @@ interface StoreState extends UndoSlice {
   patchProxy: (patch: Partial<Proxy>) => void;
   saveProxy: () => Promise<void>;
   runLint: () => Promise<LintResult | null>;
+  runAiReview: () => Promise<void>;
   toggleLintExclude: (ruleId: string) => Promise<void>;
   loadPrerequisites: () => Promise<void>;
   addTest: () => void;
@@ -138,6 +150,8 @@ interface StoreState extends UndoSlice {
   saveAsTemplate: (name: string, description: string) => Promise<void>;
 
   addPolicy: (type: string, name: string, resourceChoice?: PolicyResourceChoice) => Promise<void>;
+  addGeneratedPolicy: (type: string, name: string, xml: string) => void;
+  applyAiFix: (policyId: string, xml: string) => Promise<void>;
   addPolicyChain: (chainKey: string) => Promise<void>;
   acceptSuggestion: (type: string) => Promise<void>;
   dismissSuggestion: () => void;
@@ -329,7 +343,7 @@ async function openImportedProxy(
     activeTab: 'overview',
     selectedPolicyId: null,
     selectedTargetId: proxy.targets[0]?.id ?? null,
-    lintResult: null,
+    lintResult: null, aiReview: null,
     prerequisites: null,
     historyList: [],
     selectedEnvironmentId: null,
@@ -400,8 +414,9 @@ export const useStore = create<StoreState>((rawSet, get) => {
     selectedResourceId: null,
     toasts: [],
     suggestion: [],
-    lintResult: null,
+    lintResult: null, aiReview: null,
     linting: false,
+    reviewing: false,
     prerequisites: null,
     prerequisitesLoading: false,
     historyList: [],
@@ -411,19 +426,26 @@ export const useStore = create<StoreState>((rawSet, get) => {
     testResultsByTestId: {},
     selectedEnvironmentId: null,
 
+    // Runs once on mount. If the API server isn't up the app otherwise renders
+    // a perfectly normal-looking empty workspace — "no proxies yet" instead of
+    // "can't reach the server" — which sends people looking for the wrong bug.
     async bootstrap() {
-      await Promise.all([
-        get().refreshProxies(),
-        get().refreshTemplates(),
-        (async () => {
-          const policyTypes = await api.listPolicyTypes();
-          set({ policyTypes });
-        })(),
-        (async () => {
-          const policyChains = await api.listPolicyChains();
-          set({ policyChains });
-        })(),
-      ]);
+      try {
+        await Promise.all([
+          get().refreshProxies(),
+          get().refreshTemplates(),
+          (async () => {
+            const policyTypes = await api.listPolicyTypes();
+            set({ policyTypes });
+          })(),
+          (async () => {
+            const policyChains = await api.listPolicyChains();
+            set({ policyChains });
+          })(),
+        ]);
+      } catch (err) {
+        get().pushToast(`Couldn't load your workspace — ${(err as Error).message}`, 'error');
+      }
     },
 
     async refreshProxies() {
@@ -436,15 +458,24 @@ export const useStore = create<StoreState>((rawSet, get) => {
       set({ templates });
     },
 
+    // Opening is a plain click with no busy state and no caller that catches,
+    // so a rejection here used to surface as nothing at all — the row just
+    // didn't open. Report it and leave whatever was already open alone.
     async openProxy(id) {
-      const proxy = await api.getProxy(id);
+      let proxy: Proxy;
+      try {
+        proxy = await api.getProxy(id);
+      } catch (err) {
+        get().pushToast(`Couldn't open that proxy — ${(err as Error).message}`, 'error');
+        return;
+      }
       set({
         currentProxy: proxy,
         dirty: false,
         activeTab: 'overview',
         selectedPolicyId: null,
         selectedTargetId: proxy.targets[0]?.id ?? null,
-        lintResult: null,
+        lintResult: null, aiReview: null,
         prerequisites: null,
         historyList: [],
         selectedEnvironmentId: null,
@@ -461,7 +492,7 @@ export const useStore = create<StoreState>((rawSet, get) => {
         dirty: false,
         selectedPolicyId: null,
         selectedTargetId: null,
-        lintResult: null,
+        lintResult: null, aiReview: null,
         prerequisites: null,
         historyList: [],
         selectedEnvironmentId: null,
@@ -481,7 +512,7 @@ export const useStore = create<StoreState>((rawSet, get) => {
         activeTab: 'overview',
         selectedPolicyId: null,
         selectedTargetId: proxy.targets[0]?.id ?? null,
-        lintResult: null,
+        lintResult: null, aiReview: null,
         prerequisites: null,
         historyList: [],
         selectedEnvironmentId: null,
@@ -502,7 +533,7 @@ export const useStore = create<StoreState>((rawSet, get) => {
         activeTab: 'overview',
         selectedPolicyId: null,
         selectedTargetId: proxy.targets[0]?.id ?? null,
-        lintResult: null,
+        lintResult: null, aiReview: null,
         prerequisites: null,
         historyList: [],
         selectedEnvironmentId: null,
@@ -515,7 +546,12 @@ export const useStore = create<StoreState>((rawSet, get) => {
     },
 
     async deleteProxy(id) {
-      await api.deleteProxy(id);
+      try {
+        await api.deleteProxy(id);
+      } catch (err) {
+        get().pushToast(`Couldn't delete that proxy — ${(err as Error).message}`, 'error');
+        return;
+      }
       if (get().currentProxy?.id === id) set({ currentProxy: null });
       await get().refreshProxies();
       get().pushToast('Proxy deleted', 'info');
@@ -594,7 +630,7 @@ export const useStore = create<StoreState>((rawSet, get) => {
       if (!current) return;
       try {
         const restored = await api.restoreProxyHistory(current.id, snapshotId);
-        set({ currentProxy: restored, dirty: false, lintResult: null, prerequisites: null, selectedTestId: null, testResultsByTestId: {} });
+        set({ currentProxy: restored, dirty: false, lintResult: null, aiReview: null, prerequisites: null, selectedTestId: null, testResultsByTestId: {} });
         // Same proxy id, wholly different content: the undo stack describes a
         // timeline this restore just left, so drop it rather than let Undo
         // silently revert the restore.
@@ -713,6 +749,20 @@ export const useStore = create<StoreState>((rawSet, get) => {
         set({ linting: false });
         get().pushToast((err as Error).message, 'error');
         return null;
+      }
+    },
+
+    // Never runs automatically — not on open, not before export. It costs a
+    // request to a third party, so it happens when the user asks for it.
+    async runAiReview() {
+      const current = get().currentProxy;
+      if (!current) return;
+      set({ reviewing: true });
+      try {
+        set({ aiReview: await api.generateAiReview({ proxy: current }), reviewing: false });
+      } catch (err) {
+        set({ reviewing: false });
+        get().pushToast((err as Error).message, 'error');
       }
     },
 
@@ -953,6 +1003,44 @@ export const useStore = create<StoreState>((rawSet, get) => {
       } catch (err) {
         get().pushToast((err as Error).message, 'error');
       }
+    },
+
+    // Lands an AI-generated policy the user has accepted in the diff view.
+    // Deliberately mirrors addPolicy's tail rather than doing anything special:
+    // once accepted, generated XML is just policy XML, and taking the ordinary
+    // path is what gets it the same fast-lint markers, undo entry, suggestion
+    // follow-ups and save/export handling as a hand-added policy.
+    addGeneratedPolicy(type, name, xml) {
+      const current = get().currentProxy;
+      if (!current) return;
+      if (current.policies.some((p) => p.name === name)) {
+        get().pushToast(`A policy named "${name}" already exists`, 'error');
+        return;
+      }
+      const policy: Policy = { id: nanoid(), name, type, xml };
+      const updatedPolicies = [...current.policies, policy];
+      set({
+        currentProxy: { ...current, policies: updatedPolicies },
+        dirty: true,
+        selectedPolicyId: policy.id,
+        activeTab: 'policies',
+        suggestion: getPolicySuggestions(type, updatedPolicies.map((p) => p.type)),
+      });
+      get().pushToast(`Added policy "${name}"`, 'success');
+    },
+
+    // Accepting a fix re-lints on the spot. The finding that prompted it is
+    // still sitting in the list behind the modal, and leaving a stale entry
+    // there invites the user to "fix" something that is already fixed —
+    // re-running is the only way the tab can tell them what actually changed.
+    async applyAiFix(policyId, xml) {
+      const current = get().currentProxy;
+      const policy = current?.policies.find((p) => p.id === policyId);
+      if (!current || !policy) return;
+      get().updatePolicyXml(policyId, xml);
+      set({ selectedPolicyId: policyId });
+      get().pushToast(`Applied AI fix to "${policy.name}"`, 'success');
+      await get().runLint();
     },
 
     async acceptSuggestion(type) {
@@ -1472,6 +1560,12 @@ export const useStore = create<StoreState>((rawSet, get) => {
     },
 
     pushToast(message, tone = 'info') {
+      // Every failure in this app reaches the user as an error toast, and the
+      // forty-odd `catch (err) => pushToast(err.message, 'error')` sites all
+      // funnel through here — so this one line records all of them, without
+      // each call site having to remember to. A toast lives for 3.8 seconds;
+      // the record of it outlives the session.
+      logToast[tone === 'error' ? 'error' : 'info'](message, { tone });
       const id = nanoid();
       set({ toasts: [...get().toasts, { id, message, tone }] });
       setTimeout(() => get().dismissToast(id), 3800);

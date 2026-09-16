@@ -91,8 +91,17 @@ export const useSharedFlowStore = create<SharedFlowStoreState>((rawSet, get) => 
       set({ sharedFlows });
     },
 
+    // Same as the proxy store's openProxy: a bare click with no busy state and
+    // no caller that catches, so a rejection has to be reported here or it is
+    // invisible.
     async openSharedFlow(id) {
-      const sharedFlow = await api.getSharedFlow(id);
+      let sharedFlow: SharedFlow;
+      try {
+        sharedFlow = await api.getSharedFlow(id);
+      } catch (err) {
+        notify(`Couldn't open that shared flow — ${(err as Error).message}`, 'error');
+        return;
+      }
       set({
         currentSharedFlow: sharedFlow,
         dirty: false,
@@ -136,7 +145,12 @@ export const useSharedFlowStore = create<SharedFlowStoreState>((rawSet, get) => 
     },
 
     async deleteSharedFlow(id) {
-      await api.deleteSharedFlow(id);
+      try {
+        await api.deleteSharedFlow(id);
+      } catch (err) {
+        notify(`Couldn't delete that shared flow — ${(err as Error).message}`, 'error');
+        return;
+      }
       if (get().currentSharedFlow?.id === id) set({ currentSharedFlow: null });
       await get().refreshSharedFlows();
       notify('Shared flow deleted', 'info');
