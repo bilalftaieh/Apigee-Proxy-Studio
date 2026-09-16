@@ -70,9 +70,14 @@ export function ProxyEditor() {
     <>
       <div className="proxy-header">
         <div className="proxy-header-top">
-          <div>
+          {/* Needs the class for its own min-width:0 — without it the flex
+              parent refuses to shrink this below its longest word and the
+              title wraps a character at a time instead of truncating. */}
+          <div className="proxy-header-identity">
             <div className="proxy-title-row">
-              <h2 className="proxy-title">{proxy.name}</h2>
+              <h2 className="proxy-title" title={proxy.name}>
+                {proxy.name}
+              </h2>
               <span className="proxy-basepath">{proxy.basePath}</span>
               {dirty && <span className="dirty-dot" title="Unsaved changes" />}
             </div>
@@ -81,17 +86,11 @@ export function ProxyEditor() {
           <div className="header-actions">
             {proxy.environments.length > 0 && (
               <select
+                className="btn btn-select"
                 value={selectedEnvironmentId || ''}
                 onChange={(e) => setSelectedEnvironmentId(e.target.value || null)}
+                aria-label="Environment used for Lint, Preview and Export"
                 title="Environment used for Lint/Preview/Export"
-                style={{
-                  background: 'var(--bg-2)',
-                  border: '1px solid var(--border-strong)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '8px 10px',
-                  fontSize: 13,
-                  color: 'var(--text-0)',
-                }}
               >
                 <option value="">Base (no environment)</option>
                 {proxy.environments.map((env) => (
@@ -101,30 +100,53 @@ export function ProxyEditor() {
                 ))}
               </select>
             )}
-            <button
-              className="btn"
-              onClick={undo}
-              disabled={undoDepth === 0}
-              title={undoDepth === 0 ? 'Nothing to undo' : `Undo (Ctrl+Z) — ${undoDepth} step${undoDepth === 1 ? '' : 's'}`}
-            >
-              <Icon name="undo-2" size={14} />
-            </button>
-            <button
-              className="btn"
-              onClick={redo}
-              disabled={redoDepth === 0}
-              title={redoDepth === 0 ? 'Nothing to redo' : `Redo (Ctrl+Shift+Z) — ${redoDepth} step${redoDepth === 1 ? '' : 's'}`}
-            >
-              <Icon name="redo-2" size={14} />
-            </button>
-            <button className="btn" onClick={() => setShowHistory(true)} title="View and restore past saves">
-              <Icon name="history" size={14} />
-            </button>
-            <button className="btn" onClick={() => setShowDriftCompare(true)} title="Compare with a bundle downloaded from Apigee">
-              <Icon name="git-compare" size={14} />
-            </button>
+
+            {/* Undo/redo are the two most-used buttons here and belong to one
+                another, so they read as one control rather than as two more
+                entries in a row of seven. */}
+            <div className="btn-group">
+              <button
+                className="btn"
+                onClick={undo}
+                disabled={undoDepth === 0}
+                aria-label="Undo"
+                title={undoDepth === 0 ? 'Nothing to undo' : `Undo (Ctrl+Z) — ${undoDepth} step${undoDepth === 1 ? '' : 's'}`}
+              >
+                <Icon name="undo-2" size={14} />
+              </button>
+              <button
+                className="btn"
+                onClick={redo}
+                disabled={redoDepth === 0}
+                aria-label="Redo"
+                title={redoDepth === 0 ? 'Nothing to redo' : `Redo (Ctrl+Shift+Z) — ${redoDepth} step${redoDepth === 1 ? '' : 's'}`}
+              >
+                <Icon name="redo-2" size={14} />
+              </button>
+            </div>
+
+            {/* Both compare this proxy against another version of itself —
+                one against its own past saves, one against a bundle pulled
+                from Apigee. Rare, so they sit apart from the frequent pair
+                above rather than at the same weight as everything else. */}
+            <div className="btn-group">
+              <button className="btn" onClick={() => setShowHistory(true)} aria-label="History" title="View and restore past saves">
+                <Icon name="history" size={14} />
+              </button>
+              <button
+                className="btn"
+                onClick={() => setShowDriftCompare(true)}
+                aria-label="Compare with a deployed bundle"
+                title="Compare with a bundle downloaded from Apigee"
+              >
+                <Icon name="git-compare" size={14} />
+              </button>
+            </div>
+
+            <span className="header-actions-divider" aria-hidden="true" />
+
             <button className="btn" onClick={() => setShowSaveAsTemplate(true)}>
-              <Icon name="layout-template" size={14} /> Save as Template
+              <Icon name="layout-template" size={14} /> <span className="btn-label">Save as Template</span>
             </button>
             <ExportMenu />
             <button className="btn btn-primary" onClick={saveProxy} disabled={!dirty || saving} title="Save (Ctrl+S)">

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from './store/useStore';
 import { useSharedFlowStore } from './store/useSharedFlowStore';
 import { Sidebar } from './components/Sidebar';
@@ -12,6 +12,29 @@ import { CommandPalette } from './components/CommandPalette';
 import { LogConsole } from './components/LogConsole';
 import { useUiStore } from './store/useUiStore';
 import { useWorkspaceStore } from './store/useWorkspaceStore';
+
+/**
+ * Below this the two-pane shell stops working: a 288px sidebar leaves the
+ * editor too little to lay out its own two columns, and the header's actions
+ * wrap into a third row. The rail collapses on its own here rather than
+ * waiting for the user to notice and do it.
+ */
+const NARROW_SHELL = '(max-width: 960px)';
+
+function useNarrowShell(): boolean {
+  const [narrow, setNarrow] = useState(() => window.matchMedia(NARROW_SHELL).matches);
+
+  useEffect(() => {
+    const mq = window.matchMedia(NARROW_SHELL);
+    const onChange = (e: MediaQueryListEvent) => setNarrow(e.matches);
+    mq.addEventListener('change', onChange);
+    // The width can have changed between the initial render and this effect.
+    setNarrow(mq.matches);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  return narrow;
+}
 
 /**
  * True when the caret is somewhere with its own undo history, which should keep
@@ -34,6 +57,11 @@ export default function App() {
   const refreshSharedFlows = useSharedFlowStore((s) => s.refreshSharedFlows);
   const currentSharedFlow = useSharedFlowStore((s) => s.currentSharedFlow);
   const workspaceOpen = useWorkspaceStore((s) => s.open);
+  const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
+  const narrowShell = useNarrowShell();
+  // Either reason collapses the rail, but only the preference is the user's —
+  // the width one is undone by widening the window, not by the toggle.
+  const railCollapsed = sidebarCollapsed || narrowShell;
 
   useEffect(() => {
     bootstrap();
@@ -67,6 +95,14 @@ export default function App() {
       if ((e.key === 'k' || e.key === 'K') && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
         e.preventDefault();
         useUiStore.getState().toggleCommandPalette();
+        return;
+      }
+
+      // Ctrl/Cmd+B collapses the sidebar, the shortcut every editor with a
+      // sidebar uses. No-op while the window is narrow enough to force it.
+      if ((e.key === 'b' || e.key === 'B') && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        if (!window.matchMedia(NARROW_SHELL).matches) useUiStore.getState().toggleSidebar();
         return;
       }
 
@@ -108,8 +144,8 @@ export default function App() {
   }, []);
 
   return (
-    <div className="shell">
-      <Sidebar />
+    <div className="shell" data-sidebar={railCollapsed ? 'collapsed' : undefined}>
+      <Sidebar collapsed={railCollapsed} canToggle={!narrowShell} />
       <div className="main">
         {workspaceOpen ? (
           <WorkspaceView />

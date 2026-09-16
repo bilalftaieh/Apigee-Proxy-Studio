@@ -49,47 +49,50 @@ export function SharedFlowEditor() {
     <>
       <div className="proxy-header">
         <div className="proxy-header-top">
-          <div>
+          {/* See the matching comment in ProxyEditor — this needs min-width:0. */}
+          <div className="proxy-header-identity">
             <div className="proxy-title-row">
-              <h2 className="proxy-title">{sharedFlow.name}</h2>
+              <h2 className="proxy-title" title={sharedFlow.name}>
+                {sharedFlow.name}
+              </h2>
               <span className="proxy-basepath">
                 <Icon name="git-branch" size={11} /> Shared Flow
               </span>
               {dirty && <span className="dirty-dot" title="Unsaved changes" />}
             </div>
             <input
-              className="proxy-desc"
-              style={{
-                background: 'transparent',
-                border: 'none',
-                width: '100%',
-                maxWidth: 480,
-                padding: 0,
-                marginTop: 4,
-                fontSize: 13,
-              }}
+              className="proxy-desc proxy-desc-input"
               placeholder="Add a description…"
+              aria-label="Shared flow description"
               value={sharedFlow.description}
               onChange={(e) => patchSharedFlow({ description: e.target.value })}
             />
           </div>
           <div className="header-actions">
-            <button
-              className="btn"
-              onClick={undo}
-              disabled={undoDepth === 0}
-              title={undoDepth === 0 ? 'Nothing to undo' : `Undo (Ctrl+Z) — ${undoDepth} step${undoDepth === 1 ? '' : 's'}`}
-            >
-              <Icon name="undo-2" size={14} />
-            </button>
-            <button
-              className="btn"
-              onClick={redo}
-              disabled={redoDepth === 0}
-              title={redoDepth === 0 ? 'Nothing to redo' : `Redo (Ctrl+Shift+Z) — ${redoDepth} step${redoDepth === 1 ? '' : 's'}`}
-            >
-              <Icon name="redo-2" size={14} />
-            </button>
+            {/* Grouped the same way as the proxy editor's — see ProxyEditor. */}
+            <div className="btn-group">
+              <button
+                className="btn"
+                onClick={undo}
+                disabled={undoDepth === 0}
+                aria-label="Undo"
+                title={undoDepth === 0 ? 'Nothing to undo' : `Undo (Ctrl+Z) — ${undoDepth} step${undoDepth === 1 ? '' : 's'}`}
+              >
+                <Icon name="undo-2" size={14} />
+              </button>
+              <button
+                className="btn"
+                onClick={redo}
+                disabled={redoDepth === 0}
+                aria-label="Redo"
+                title={redoDepth === 0 ? 'Nothing to redo' : `Redo (Ctrl+Shift+Z) — ${redoDepth} step${redoDepth === 1 ? '' : 's'}`}
+              >
+                <Icon name="redo-2" size={14} />
+              </button>
+            </div>
+
+            <span className="header-actions-divider" aria-hidden="true" />
+
             <button className="btn" onClick={exportSharedFlow} disabled={linting} title="Runs apigeelint first — blocked if it finds errors">
               {linting ? <span className="spinner" /> : <Icon name="download" size={14} />}
               {linting ? 'Linting…' : 'Export ZIP'}

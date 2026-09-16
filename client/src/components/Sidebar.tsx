@@ -11,7 +11,12 @@ import { ImportProxyModal } from './ImportProxyModal';
 import { ConfirmModal } from './ConfirmModal';
 import type { Template } from '../types/proxy';
 
-export function Sidebar() {
+/**
+ * `collapsed` is the rail state as decided by App — the user's preference or a
+ * window too narrow for the full sidebar. `canToggle` is false in the second
+ * case, where the toggle would appear to do nothing.
+ */
+export function Sidebar({ collapsed = false, canToggle = true }: { collapsed?: boolean; canToggle?: boolean }) {
   const proxies = useStore((s) => s.proxies);
   const templates = useStore((s) => s.templates);
   const currentProxy = useStore((s) => s.currentProxy);
@@ -31,6 +36,7 @@ export function Sidebar() {
   const closeSharedFlow = useSharedFlowStore((s) => s.closeSharedFlow);
 
   const openCommandPalette = useUiStore((s) => s.openCommandPalette);
+  const toggleSidebar = useUiStore((s) => s.toggleSidebar);
   const workspaceOpen = useWorkspaceStore((s) => s.open);
   const openWorkspace = useWorkspaceStore((s) => s.openWorkspace);
   const closeWorkspace = useWorkspaceStore((s) => s.closeWorkspace);
@@ -99,21 +105,36 @@ export function Sidebar() {
         </div>
         {/* The palette is keyboard-first, so it needs somewhere visible to be
             discovered from. The search box below is a different thing — it
-            filters this list in place. */}
+            filters this list in place. In the rail it is the only way left to
+            search, so it stays while the search box goes. */}
         <button
           className="brand-cmdk"
           onClick={openCommandPalette}
           aria-label="Open command palette"
           title="Command palette (Ctrl+K)"
         >
-          <Icon name="command" size={12} />K
+          <Icon name="command" size={12} />
+          <span className="brand-cmdk-key">K</span>
         </button>
+        {canToggle && (
+          <button
+            className="icon-btn sidebar-toggle"
+            onClick={toggleSidebar}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-expanded={!collapsed}
+            title={`${collapsed ? 'Expand' : 'Collapse'} sidebar (Ctrl+B)`}
+          >
+            <Icon name={collapsed ? 'chevron-right' : 'chevron-left'} size={15} />
+          </button>
+        )}
       </div>
 
-      <div className="search-box">
-        <Icon name="search" size={14} />
-        <input placeholder="Search proxies…" value={query} onChange={(e) => setQuery(e.target.value)} />
-      </div>
+      {!collapsed && (
+        <div className="search-box">
+          <Icon name="search" size={14} />
+          <input placeholder="Search proxies…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        </div>
+      )}
 
       <div className="sidebar-scroll">
         {/* Above the lists on purpose: this is the only view that's about all
@@ -125,6 +146,7 @@ export function Sidebar() {
               className="nav-item-main"
               aria-current={workspaceOpen || undefined}
               onClick={() => (workspaceOpen ? closeWorkspace() : openWorkspace())}
+              title={collapsed ? 'Workspace Audit' : undefined}
             >
               <span className="nav-item-icon">
                 <Icon name="radar" size={14} />
@@ -177,6 +199,7 @@ export function Sidebar() {
                 className="nav-item-main"
                 aria-current={currentProxy?.id === p.id || undefined}
                 onClick={() => handleOpenProxy(p.id)}
+                title={collapsed ? `${p.name} — ${p.basePath}` : undefined}
               >
                 <span className="nav-item-icon">
                   <Icon name="waypoints" size={14} />
@@ -248,6 +271,7 @@ export function Sidebar() {
                 className="nav-item-main"
                 aria-current={currentSharedFlow?.id === sf.id || undefined}
                 onClick={() => handleOpenSharedFlow(sf.id)}
+                title={collapsed ? sf.name : undefined}
               >
                 <span className="nav-item-icon">
                   <Icon name="git-branch" size={14} />
@@ -288,7 +312,12 @@ export function Sidebar() {
           </div>
           {templates.map((t) => (
             <div key={t.id} className="nav-item">
-              <button type="button" className="nav-item-main" onClick={() => setTemplateToUse(t)}>
+              <button
+                type="button"
+                className="nav-item-main"
+                onClick={() => setTemplateToUse(t)}
+                title={collapsed ? t.name : undefined}
+              >
                 <span className="nav-item-icon">
                   <Icon name="layout-template" size={14} />
                 </span>
