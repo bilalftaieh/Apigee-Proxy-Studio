@@ -1,4 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@400;500&display=swap');
+/* The weights here must match the weights the stylesheets actually ask for.
+   600 was used 35 times across the app but never requested, so every one of
+   them matched to the 700 face — section headings, chips and badges were all
+   rendering a step heavier than written. 300 was requested and never used. */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap');
 
 /*
   Google Cloud's *developer* surfaces — Logs Explorer, BigQuery Studio — rather
@@ -131,7 +135,13 @@
   --control-h: 32px;
   --toolbar-h: 34px;
 
-  --font-sans: 'Google Sans', 'Google Sans Text', Roboto, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* Roboto first, not Google Sans. Google Sans is proprietary and Google Fonts
+     does not serve it, so the @import above never delivered it: it resolved
+     only on machines that happen to have it installed locally, and the whole
+     UI then rendered in a different typeface with different metrics from the
+     one every size and line-height here was tuned against. Naming the font we
+     actually ship makes the type deterministic. */
+  --font-sans: Roboto, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'Roboto Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
 
   color-scheme: light;
