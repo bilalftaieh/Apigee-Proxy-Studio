@@ -9,12 +9,26 @@ const CURL_PLACEHOLDER = `curl 'https://api.example.com/v1/pets/42' \\
   -H 'Accept: application/json' \\
   -H 'Authorization: Bearer <token>'`;
 
-const OPENAPI_PLACEHOLDER = `Paste an OpenAPI 3.x or Swagger 2.0 document here (JSON or YAML) — or choose a file below.`;
-const POSTMAN_PLACEHOLDER = `Paste an exported Postman Collection v2.1 JSON here — or choose a file below.`;
-const WSDL_PLACEHOLDER = `Paste a WSDL document here — or choose a file below.`;
+const OPENAPI_PLACEHOLDER = `Paste your OpenAPI 3.x or Swagger 2.0 specification here (JSON or YAML). You can also select a file using the chooser below.`;
+const POSTMAN_PLACEHOLDER = `Paste your Postman Collection v2.1 export (JSON) here. Alternatively, use the file chooser below.`;
+const WSDL_PLACEHOLDER = `Paste your WSDL document content here. Or select a .wsdl or .xml file using the chooser below.`;
 
-// Shared by the OpenAPI and Postman forms: a textarea plus a file picker,
-// either of which populates the same text value.
+const HINTS = {
+  openapi: {
+    hint: 'OpenAPI specifications are bundled as-is and validated by Apigee\'s OASValidation policy at runtime. No external references are fetched.',
+    loaded: (name: string) => `Loaded: ${name}`,
+  },
+  postman: {
+    hint: 'Only the collection\'s built-in variables are resolved. Postman environment files and network calls are not supported.',
+    loaded: (name: string) => `Loaded: ${name}`,
+  },
+  wsdl: {
+    hint: 'Only self-contained WSDL documents are supported. External XSD imports via <xsd:import> are not yet resolved.',
+    loaded: (name: string) => `Loaded: ${name}`,
+  },
+};
+
+// Reusable form component for text-based imports (OpenAPI, Postman, WSDL)
 function TextImportForm({
   label,
   placeholder,
@@ -29,6 +43,8 @@ function TextImportForm({
   error,
   onBack,
   onSubmit,
+  submitLabel = 'Import proxy',
+  importingLabel = 'Importing proxy...',
 }: {
   label: string;
   placeholder: string;
@@ -43,39 +59,93 @@ function TextImportForm({
   error: string | null;
   onBack: () => void;
   onSubmit: () => void;
+  submitLabel?: string;
+  importingLabel?: string;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
+  
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (file) onFile(file);
   };
+
   return (
     <>
-      <div className="field" style={{ marginBottom: 10 }}>
+      <div className="field" style={{ marginBottom: 12 }}>
         <label>{label}</label>
         <textarea
           autoFocus
           placeholder={placeholder}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          style={{ minHeight: 200, fontFamily: 'var(--font-mono)', fontSize: 12 }}
+          style={{ 
+            minHeight: 220, 
+            fontFamily: 'var(--font-mono)', 
+            fontSize: 12,
+            resize: 'vertical'
+          }}
         />
         <div className="field-hint" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <input ref={fileRef} type="file" accept={accept} style={{ display: 'none' }} onChange={handleFile} />
-          <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 11.5 }} onClick={() => fileRef.current?.click()}>
-            Choose File
+          <input 
+            ref={fileRef} 
+            type="file" 
+            accept={accept} 
+            style={{ display: 'none' }} 
+            onChange={handleFile} 
+          />
+          <button 
+            className="btn btn-ghost" 
+            style={{ padding: '4px 10px', fontSize: 11.5 }} 
+            onClick={() => fileRef.current?.click()}
+            disabled={busy}
+          >
+            <Icon name="upload" size={14} />
+            Choose file
           </button>
-          {fileName ? loadedHint : hint}
+          <span style={{ color: fileName ? 'var(--text-1)' : 'var(--text-3)' }}>
+            {fileName ? loadedHint : hint}
+          </span>
         </div>
       </div>
-      {error && <p style={{ color: 'var(--error)', fontSize: 12, marginTop: 4 }}>{error}</p>}
+      
+      {error && (
+        <p style={{ 
+          color: 'var(--error-ink)', 
+          fontSize: 12, 
+          marginTop: 0,
+          marginBottom: 12,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6
+        }}>
+          <Icon name="error" size={14} />
+          {error}
+        </p>
+      )}
+      
       <div className="modal-footer">
-        <button className="btn btn-ghost" onClick={onBack}>
-          &larr; Back
+        <button 
+          className="btn btn-ghost" 
+          onClick={onBack}
+          disabled={busy}
+        >
+          Back
         </button>
-        <button className="btn btn-primary" disabled={busy} onClick={onSubmit}>
-          {busy ? <span className="spinner" /> : 'Import'}
+        <button 
+          className="btn btn-primary" 
+          disabled={busy || !value.trim()} 
+          onClick={onSubmit}
+          style={{ minWidth: 120 }}
+        >
+          {busy ? (
+            <>
+              <span className="spinner spinner-sm" style={{ width: 14, height: 14, marginRight: 6 }} />
+              {importingLabel}
+            </>
+          ) : (
+            submitLabel
+          )}
         </button>
       </div>
     </>
@@ -166,11 +236,11 @@ export function ImportProxyModal({ onClose, onPickZip }: { onClose: () => void; 
   };
 
   const titles: Record<Mode, string> = {
-    choose: 'Import a Proxy',
-    curl: 'Import from a curl Command',
-    openapi: 'Import from an OpenAPI / Swagger Spec',
-    postman: 'Import from a Postman Collection',
-    wsdl: 'Import from a WSDL File',
+    choose: 'Import proxy',
+    curl: 'Import from curl command',
+    openapi: 'Import from OpenAPI spec',
+    postman: 'Import from Postman collection',
+    wsdl: 'Import from WSDL file',
   };
 
   return (
@@ -227,26 +297,60 @@ export function ImportProxyModal({ onClose, onPickZip }: { onClose: () => void; 
 
       {mode === 'curl' && (
         <>
-          <div className="field" style={{ marginBottom: 10 }}>
-            <label>curl Command</label>
+          <div className="field" style={{ marginBottom: 12 }}>
+            <label>curl command</label>
             <textarea
               autoFocus
               placeholder={CURL_PLACEHOLDER}
               value={curlText}
               onChange={(e) => setCurlText(e.target.value)}
-              style={{ minHeight: 140, fontFamily: 'var(--font-mono)', fontSize: 12 }}
+              style={{ 
+                minHeight: 160, 
+                fontFamily: 'var(--font-mono)', 
+                fontSize: 12,
+                resize: 'vertical'
+              }}
             />
             <div className="field-hint">
-              Bash-style commands only (e.g. copied from a browser's DevTools → Copy as cURL).
+              Bash-style commands only (for example, copied from a browser's DevTools → Copy as cURL).
             </div>
           </div>
-          {error && <p style={{ color: 'var(--error)', fontSize: 12, marginTop: 4 }}>{error}</p>}
+          {error && (
+            <p style={{ 
+              color: 'var(--error-ink)', 
+              fontSize: 12, 
+              marginTop: 0,
+              marginBottom: 12,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6
+            }}>
+              <Icon name="error" size={14} />
+              {error}
+            </p>
+          )}
           <div className="modal-footer">
-            <button className="btn btn-ghost" onClick={() => goTo('choose')}>
-              &larr; Back
+            <button 
+              className="btn btn-ghost" 
+              onClick={() => goTo('choose')}
+              disabled={busy}
+            >
+              Back
             </button>
-            <button className="btn btn-primary" disabled={busy} onClick={submitCurl}>
-              {busy ? <span className="spinner" /> : 'Import'}
+            <button 
+              className="btn btn-primary" 
+              disabled={busy || !curlText.trim()} 
+              onClick={submitCurl}
+              style={{ minWidth: 120 }}
+            >
+              {busy ? (
+                <>
+                  <span className="spinner spinner-sm" style={{ width: 14, height: 14, marginRight: 6 }} />
+                  Importing proxy...
+                </>
+              ) : (
+                'Import proxy'
+              )}
             </button>
           </div>
         </>
@@ -254,7 +358,7 @@ export function ImportProxyModal({ onClose, onPickZip }: { onClose: () => void; 
 
       {mode === 'openapi' && (
         <TextImportForm
-          label="Spec"
+          label="OpenAPI specification"
           placeholder={OPENAPI_PLACEHOLDER}
           accept=".json,.yaml,.yml"
           value={specText}
@@ -267,8 +371,8 @@ export function ImportProxyModal({ onClose, onPickZip }: { onClose: () => void; 
             setSpecFileName(file.name);
             setSpecText(await file.text());
           }}
-          hint="Nothing is fetched over the network — the whole spec is bundled as-is and validated by Apigee's own OASValidation policy at runtime."
-          loadedHint={`Loaded ${specFileName}`}
+          hint={HINTS.openapi.hint}
+          loadedHint={HINTS.openapi.loaded(specFileName || '')}
           busy={busy}
           error={error}
           onBack={() => goTo('choose')}
@@ -278,7 +382,7 @@ export function ImportProxyModal({ onClose, onPickZip }: { onClose: () => void; 
 
       {mode === 'postman' && (
         <TextImportForm
-          label="Collection"
+          label="Postman collection"
           placeholder={POSTMAN_PLACEHOLDER}
           accept=".json"
           value={postmanText}
@@ -291,8 +395,8 @@ export function ImportProxyModal({ onClose, onPickZip }: { onClose: () => void; 
             setPostmanFileName(file.name);
             setPostmanText(await file.text());
           }}
-          hint="Only the collection's own variables are resolved — no separate Postman environment file, no network calls."
-          loadedHint={`Loaded ${postmanFileName}`}
+          hint={HINTS.postman.hint}
+          loadedHint={HINTS.postman.loaded(postmanFileName || '')}
           busy={busy}
           error={error}
           onBack={() => goTo('choose')}
@@ -302,7 +406,7 @@ export function ImportProxyModal({ onClose, onPickZip }: { onClose: () => void; 
 
       {mode === 'wsdl' && (
         <TextImportForm
-          label="WSDL"
+          label="WSDL document"
           placeholder={WSDL_PLACEHOLDER}
           accept=".wsdl,.xml"
           value={wsdlText}
@@ -315,8 +419,8 @@ export function ImportProxyModal({ onClose, onPickZip }: { onClose: () => void; 
             setWsdlFileName(file.name);
             setWsdlText(await file.text());
           }}
-          hint="Nothing is fetched over the network. Only a single self-contained WSDL is supported for now — WSDLs that reference external .xsd files via <xsd:import> aren't resolved yet."
-          loadedHint={`Loaded ${wsdlFileName}`}
+          hint={HINTS.wsdl.hint}
+          loadedHint={HINTS.wsdl.loaded(wsdlFileName || '')}
           busy={busy}
           error={error}
           onBack={() => goTo('choose')}

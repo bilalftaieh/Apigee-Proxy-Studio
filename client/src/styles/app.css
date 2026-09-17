@@ -1909,9 +1909,9 @@
 .policy-editor-head input {
   background: transparent;
   border: none;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-0);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-1);
   font-family: var(--font-mono);
   outline: none;
   border-bottom: 1px dashed transparent;
@@ -1919,6 +1919,7 @@
 }
 .policy-editor-head input:focus {
   border-bottom-color: var(--accent-blue);
+  color: var(--text-0);
 }
 
 .monaco-wrap {
@@ -3459,12 +3460,34 @@
   cursor: pointer;
   user-select: none;
 }
-.checkbox-row input[type='checkbox'] {
-  width: 14px;
-  height: 14px;
+/* Global checkbox styling - GCP Apigee style */
+input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
   accent-color: var(--accent-blue);
   cursor: pointer;
+  margin: 0;
   flex-shrink: 0;
+}
+
+input[type='checkbox']:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
+}
+
+/* Global radio button styling - GCP Apigee style */
+input[type='radio'] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-blue);
+  cursor: pointer;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+input[type='radio']:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
 }
 .checkbox-row .field-hint {
   margin: 0;

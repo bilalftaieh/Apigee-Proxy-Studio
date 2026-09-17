@@ -1,13 +1,40 @@
+# Dependencies
 node_modules/
+
+# Build artifacts
 dist/
-.claude/
-.DS_Store
-*.log
-# Rotated log files (studio.log.1, .2 …) don't match *.log
-server/logs/
+build/
+.vite/
+
+# Environment variables
 .env
 .env.local
 !.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo
+
+# Claude Code
+.claude/
+
+# Local runtime data (proxy/shared-flow history and saved data are generated
+# locally and shouldn't be version-controlled)
 server/data/*
 !server/data/proxies/
 !server/data/templates/
@@ -15,7 +42,15 @@ server/data/proxies/*
 server/data/templates/*
 !server/data/proxies/.gitkeep
 !server/data/templates/.gitkeep
+
+# Test bundles
 server/test-bundles/*.zip
 
-# Cached Apigee reference pages for scripts/generate-policy-schemas.mjs
+# Docs cache
 scripts/.docs-cache/
+
+# Archives
+*.zip
+*.tar
+*.gz
+*.tgz
