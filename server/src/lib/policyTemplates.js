@@ -343,7 +343,7 @@ export const POLICY_TYPES = [
     tier: 'extensible',
     label: 'Basic Authentication',
     category: 'Security',
-    icon: 'user-lock',
+    icon: 'id-card',
     accent: '#FFB454',
     description: 'Encodes or decodes HTTP Basic Authentication credentials.',
     defaultXml: (name) => `${XML_HEADER}<BasicAuthentication continueOnError="false" enabled="true" name="${escapeXml(name)}">
