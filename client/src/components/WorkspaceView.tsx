@@ -106,7 +106,7 @@ export function WorkspaceView() {
                 <Icon name={t.icon} size={14} />
                 {t.label}
                 {problems > 0 ? (
-                  <span className="tab-count" style={{ color: 'var(--error)', background: 'rgba(242, 85, 92, 0.15)' }}>
+                  <span className="tab-count" style={{ color: 'var(--error-ink)', background: 'var(--error-soft)' }}>
                     {problems}
                   </span>
                 ) : (
@@ -120,7 +120,7 @@ export function WorkspaceView() {
 
       <div className="tab-panel">
         {error && (
-          <div className="card" style={{ borderColor: 'rgba(242, 85, 92, 0.4)' }}>
+          <div className="card" style={{ borderColor: 'var(--error)' }}>
             <h4 className="card-title" style={{ color: 'var(--error)' }}>
               <Icon name="alert-circle" size={15} /> Couldn't audit the workspace
             </h4>

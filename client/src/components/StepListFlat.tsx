@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Icon } from './Icon';
+import { policyCategory, policyAbbr } from '../lib/policyCategory';
 import type { Step } from '../types/proxy';
 
 export function StepListFlat({
@@ -10,6 +11,7 @@ export function StepListFlat({
   onRemove,
   onMove,
   onJumpToPolicy,
+  resolvePolicyType,
 }: {
   steps: Step[];
   availablePolicies: string[];
@@ -19,6 +21,13 @@ export function StepListFlat({
   onMove: (index: number, direction: -1 | 1) => void;
   /** When provided, an attached policy's name becomes a link that jumps to it (e.g. selects it on the Policies tab). */
   onJumpToPolicy?: (policyName: string) => void;
+  /**
+   * Resolves a step's policy to its type so the row can show the category chip.
+   * A prop rather than a store read because this list is shared between the
+   * proxy editor and the shared-flow editor, which keep their policies in
+   * different stores. Omitted: the rows simply have no chip.
+   */
+  resolvePolicyType?: (policyName: string) => string | undefined;
 }) {
   const [pending, setPending] = useState('');
 
@@ -39,6 +48,19 @@ export function StepListFlat({
                   <Icon name="chevron-down" size={12} />
                 </button>
               </div>
+              {/* Same chip as the policy list: the family, in the two
+                  letters the name itself uses. A step row names a policy but
+                  not its type, which meant reading a flow told you the order
+                  of things and nothing about what they do. */}
+              {(() => {
+                const stepType = resolvePolicyType?.(step.policyName);
+                if (!stepType) return null;
+                return (
+                  <span className="policy-cat" data-cat={policyCategory(stepType)} title={stepType}>
+                    {policyAbbr(stepType)}
+                  </span>
+                );
+              })()}
               {availablePolicies.includes(step.policyName) ? (
                 onJumpToPolicy ? (
                   <button

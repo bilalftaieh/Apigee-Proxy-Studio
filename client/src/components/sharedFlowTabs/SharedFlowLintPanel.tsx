@@ -57,7 +57,7 @@ export function SharedFlowLintPanel() {
       )}
 
       {lintResult && !lintResult.ok && (
-        <div className="card" style={{ borderColor: 'rgba(242, 85, 92, 0.4)' }}>
+        <div className="card" style={{ borderColor: 'var(--error)' }}>
           <h4 className="card-title" style={{ color: 'var(--error)' }}>
             <Icon name="alert-circle" size={15} /> Couldn't run apigeelint
           </h4>
@@ -87,10 +87,10 @@ export function SharedFlowLintPanel() {
             style={{
               borderColor:
                 lintResult.errorCount > 0
-                  ? 'rgba(242, 85, 92, 0.4)'
+                  ? 'var(--error)'
                   : lintResult.warningCount > 0
-                  ? 'rgba(255, 180, 84, 0.4)'
-                  : 'rgba(47, 212, 143, 0.4)',
+                  ? 'var(--warning)'
+                  : 'var(--success)',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -139,8 +139,8 @@ export function SharedFlowLintPanel() {
                       className="template-badge"
                       style={
                         m.severity === 'error'
-                          ? { color: 'var(--error)', background: 'rgba(242, 85, 92, 0.1)', borderColor: 'rgba(242, 85, 92, 0.3)' }
-                          : { color: 'var(--warning)', background: 'rgba(255, 180, 84, 0.1)', borderColor: 'rgba(255, 180, 84, 0.3)' }
+                          ? { color: 'var(--error)', background: 'var(--error-soft)', borderColor: 'rgba(217, 48, 37, 0.32)' }
+                          : { color: 'var(--warning)', background: 'var(--warning-soft)', borderColor: 'rgba(227, 116, 0, 0.34)' }
                       }
                     >
                       {m.severity}

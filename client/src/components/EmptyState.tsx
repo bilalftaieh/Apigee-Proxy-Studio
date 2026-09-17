@@ -12,9 +12,6 @@ export function EmptyState() {
 
   return (
     <div className="empty-state">
-      <div className="empty-orb">
-        <Icon name="puzzle" size={38} color="#06120e" />
-      </div>
       <h2>Design your next Apigee X proxy</h2>
       <p>
         Build proxy endpoints, conditional flows and policies visually, then export a ready-to-import

@@ -362,7 +362,7 @@ export function FlowDiagramTab() {
     if (!cardRef.current) return;
     setExporting(true);
     try {
-      const background = getComputedStyle(document.body).getPropertyValue('--bg-0').trim() || '#0a0c12';
+      const background = getComputedStyle(document.body).getPropertyValue('--bg-0').trim() || '#ffffff';
       const blob = await nodeToPngBlob(cardRef.current, { background });
       downloadBlob(blob, `${proxy.name || 'proxy'}-flow-diagram.png`);
       pushToast('Flow diagram exported as PNG.', 'success');

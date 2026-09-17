@@ -1,8 +1,14 @@
+import { useEffect, useState } from 'react';
 import { useStore } from '../../store/useStore';
+import { api } from '../../api/client';
 import { Icon } from '../Icon';
+import { AiFixModal, type FixableFinding } from '../AiFixModal';
+import { AiReviewPanel } from '../AiReviewPanel';
 import { PrerequisitesPanel } from '../PrerequisitesPanel';
 import { EntityJumpButton } from '../EntityJumpButton';
 import { findEntityJump } from '../../lib/entityLinks';
+import { findFixablePolicy } from '../../lib/aiFix';
+import type { Policy } from '../../types/proxy';
 
 export function LintTab() {
   const proxy = useStore((s) => s.currentProxy)!;
@@ -10,6 +16,26 @@ export function LintTab() {
   const lintResult = useStore((s) => s.lintResult);
   const runLint = useStore((s) => s.runLint);
   const toggleLintExclude = useStore((s) => s.toggleLintExclude);
+
+  const [fixing, setFixing] = useState<{ finding: FixableFinding; policy: Policy } | null>(null);
+  // Null until the status call lands, so the button doesn't flicker in and then
+  // out again on a workspace where AI isn't configured.
+  const [aiReady, setAiReady] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (proxy.aiDisabled) {
+      setAiReady(false);
+      return;
+    }
+    let cancelled = false;
+    api
+      .aiStatus()
+      .then((s) => !cancelled && setAiReady(s.configured))
+      .catch(() => !cancelled && setAiReady(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [proxy.aiDisabled]);
 
   return (
     <div>
@@ -60,7 +86,7 @@ export function LintTab() {
       )}
 
       {lintResult && !lintResult.ok && (
-        <div className="card" style={{ borderColor: 'rgba(242, 85, 92, 0.4)' }}>
+        <div className="card" style={{ borderColor: 'var(--error)' }}>
           <h4 className="card-title" style={{ color: 'var(--error)' }}>
             <Icon name="alert-circle" size={15} /> Couldn't run apigeelint
           </h4>
@@ -85,78 +111,59 @@ export function LintTab() {
 
       {lintResult?.ok && (
         <>
-          <div
-            className="card"
-            style={{
-              borderColor:
-                lintResult.errorCount > 0
-                  ? 'rgba(242, 85, 92, 0.4)'
-                  : lintResult.warningCount > 0
-                  ? 'rgba(255, 180, 84, 0.4)'
-                  : 'rgba(47, 212, 143, 0.4)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Icon
-                name={lintResult.errorCount > 0 ? 'x-circle' : lintResult.warningCount > 0 ? 'alert-triangle' : 'check-circle-2'}
-                size={20}
-                color={
-                  lintResult.errorCount > 0
-                    ? 'var(--error)'
-                    : lintResult.warningCount > 0
-                    ? 'var(--warning)'
-                    : 'var(--success)'
-                }
-              />
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 14 }}>
-                  {lintResult.errorCount > 0
-                    ? `${lintResult.errorCount} error${lintResult.errorCount === 1 ? '' : 's'}, ${lintResult.warningCount} warning${lintResult.warningCount === 1 ? '' : 's'}`
-                    : lintResult.warningCount > 0
-                    ? `Clean — ${lintResult.warningCount} warning${lintResult.warningCount === 1 ? '' : 's'} only`
-                    : 'Clean — no issues found'}
-                </div>
-                <div className="field-hint">
-                  {lintResult.errorCount > 0
-                    ? 'Export is blocked until these are resolved.'
-                    : 'Ready to export.'}
-                </div>
-              </div>
-            </div>
+          <div className="lint-summary" data-state={lintResult.errorCount > 0 ? 'error' : lintResult.warningCount > 0 ? 'warning' : 'clean'}>
+            <Icon
+              name={lintResult.errorCount > 0 ? 'x-circle' : lintResult.warningCount > 0 ? 'alert-triangle' : 'check-circle-2'}
+              size={16}
+            />
+            <span className="lint-summary-counts">
+              <span className="lint-count" data-severity="error">
+                {lintResult.errorCount} error{lintResult.errorCount === 1 ? '' : 's'}
+              </span>
+              <span className="lint-count" data-severity="warning">
+                {lintResult.warningCount} warning{lintResult.warningCount === 1 ? '' : 's'}
+              </span>
+              <span className="lint-count">
+                {lintResult.files.length} file{lintResult.files.length === 1 ? '' : 's'}
+              </span>
+            </span>
+            <span className="lint-summary-verdict">
+              {lintResult.errorCount > 0 ? 'Export is blocked until these are resolved.' : 'Ready to export.'}
+            </span>
           </div>
 
           {lintResult.files.map((file) => (
-            <div className="card" key={file.filePath}>
-              <h4 className="card-title mono" style={{ fontSize: 12.5 }}>
-                <Icon name="file-code" size={14} /> {file.filePath}
-              </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+            <div className="lint-file" key={file.filePath}>
+              <div className="lint-file-head">
+                <Icon name="file-code" size={13} />
+                <span className="mono">{file.filePath}</span>
+                <span className="lint-file-count">{file.messages.length}</span>
+              </div>
+              <div className="lint-rows">
                 {file.messages.map((m, i) => {
                   const jump = findEntityJump(m.message, proxy);
+                  // Only findings that belong to one policy file can be fixed
+                  // this way — see lib/aiFix. Everything else is a proxy-model
+                  // edit the owning tab already does in one click.
+                  const fixablePolicy = aiReady ? findFixablePolicy(proxy, { ...m, filePath: file.filePath }) : null;
                   return (
-                  <div
-                    key={i}
-                    className="entity-row"
-                    style={{
-                      alignItems: 'flex-start',
-                      borderLeft: `3px solid ${m.severity === 'error' ? 'var(--error)' : 'var(--warning)'}`,
-                    }}
-                  >
-                    <span
-                      className="template-badge"
-                      style={
-                        m.severity === 'error'
-                          ? { color: 'var(--error)', background: 'rgba(242, 85, 92, 0.1)', borderColor: 'rgba(242, 85, 92, 0.3)' }
-                          : { color: 'var(--warning)', background: 'rgba(255, 180, 84, 0.1)', borderColor: 'rgba(255, 180, 84, 0.3)' }
-                      }
-                    >
-                      {m.severity}
-                    </span>
-                    <span className="mono field-hint" style={{ flexShrink: 0 }}>
+                  <div key={i} className="lint-row" data-severity={m.severity}>
+                    <span className="lint-row-sev">{m.severity}</span>
+                    <span className="lint-row-loc mono">
                       {m.line != null ? `${m.line}:${m.column ?? 0}` : '—'}
                     </span>
-                    <span style={{ flex: 1, fontSize: 12.5 }}>{m.message}</span>
+                    <span className="lint-row-msg">{m.message}</span>
                     {jump && <EntityJumpButton jump={jump} />}
+                    {fixablePolicy && (
+                      <button
+                        className="btn btn-sm btn-ghost"
+                        style={{ flexShrink: 0 }}
+                        onClick={() => setFixing({ finding: { ...m, filePath: file.filePath }, policy: fixablePolicy })}
+                        title={`Propose a fix for ${fixablePolicy.name}`}
+                      >
+                        <Icon name="sparkles" size={12} /> Fix with AI
+                      </button>
+                    )}
                     {m.ruleId && (
                       <>
                         <span className="field-hint mono" style={{ flexShrink: 0 }}>
@@ -181,7 +188,13 @@ export function LintTab() {
         </>
       )}
 
+      <AiReviewPanel />
+
       <PrerequisitesPanel />
+
+      {fixing && (
+        <AiFixModal finding={fixing.finding} policy={fixing.policy} onClose={() => setFixing(null)} />
+      )}
     </div>
   );
 }

@@ -4,23 +4,35 @@ import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { Icon } from '../Icon';
 import type { GovernanceSeverity } from '../../types/workspace';
 
+/** The identifying hue, for 3px edges and other non-text marks. */
 export const SEVERITY_COLOR: Record<GovernanceSeverity, string> = {
   error: 'var(--error)',
   warning: 'var(--warning)',
   info: 'var(--info)',
 };
 
+/**
+ * The same severities darkened for text. The badge sets 9.5px type, and the
+ * bright marks above land near 4.0:1 on their own tints — under AA. Same split
+ * as the policy categories: one value cannot both identify and be read.
+ */
+export const SEVERITY_INK: Record<GovernanceSeverity, string> = {
+  error: 'var(--error-ink)',
+  warning: 'var(--warning-ink)',
+  info: 'var(--accent-blue-ink)',
+};
+
 export const SEVERITY_TINT: Record<GovernanceSeverity, string> = {
-  error: 'rgba(242, 85, 92, 0.12)',
-  warning: 'rgba(255, 180, 84, 0.12)',
-  info: 'rgba(108, 142, 255, 0.12)',
+  error: 'var(--error-soft)',
+  warning: 'var(--warning-soft)',
+  info: 'var(--info-soft)',
 };
 
 export function SeverityBadge({ severity, children }: { severity: GovernanceSeverity; children?: React.ReactNode }) {
   return (
     <span
       className="template-badge"
-      style={{ color: SEVERITY_COLOR[severity], background: SEVERITY_TINT[severity], borderColor: SEVERITY_COLOR[severity] }}
+      style={{ color: SEVERITY_INK[severity], background: SEVERITY_TINT[severity], borderColor: 'transparent' }}
     >
       {children ?? severity}
     </span>
@@ -66,7 +78,7 @@ export function Row({ severity, children }: { severity?: GovernanceSeverity; chi
   return (
     <div
       className="entity-row"
-      style={{ alignItems: 'flex-start', borderLeft: severity ? `3px solid ${SEVERITY_COLOR[severity]}` : undefined }}
+      style={{ alignItems: 'flex-start', borderLeft: severity ? `3px solid ${SEVERITY_COLOR[severity]}` : '3px solid transparent' }}
     >
       {children}
     </div>

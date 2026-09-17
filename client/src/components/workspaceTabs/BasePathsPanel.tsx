@@ -13,7 +13,7 @@ export function BasePathsPanel({ basePaths }: { basePaths: BasePathAnalysis }) {
   return (
     <div>
       {conflicts.length > 0 && (
-        <div className="card" style={{ borderColor: 'rgba(242, 85, 92, 0.4)' }}>
+        <div className="card" style={{ borderColor: 'var(--error)' }}>
           <h4 className="card-title" style={{ color: 'var(--error)' }}>
             <Icon name="x-circle" size={15} /> {conflicts.length} base path conflict{conflicts.length === 1 ? '' : 's'}
           </h4>

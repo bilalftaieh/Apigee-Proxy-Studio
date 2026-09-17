@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useStore, type StepLocation } from '../store/useStore';
 import type { Step } from '../types/proxy';
 import { Icon } from './Icon';
+import { policyCategory, policyAbbr } from '../lib/policyCategory';
 
 export function StepList({ location, steps }: { location: StepLocation; steps: Step[] }) {
   const proxy = useStore((s) => s.currentProxy)!;
@@ -11,6 +12,7 @@ export function StepList({ location, steps }: { location: StepLocation; steps: S
   const moveStep = useStore((s) => s.moveStep);
   const setSelectedPolicyId = useStore((s) => s.setSelectedPolicyId);
   const setActiveTab = useStore((s) => s.setActiveTab);
+  const policyTypes = useStore((s) => s.policyTypes);
   const [pending, setPending] = useState('');
 
   const availablePolicies = proxy.policies.map((p) => p.name);
@@ -39,6 +41,24 @@ export function StepList({ location, steps }: { location: StepLocation; steps: S
                   <Icon name="chevron-down" size={12} />
                 </button>
               </div>
+              {/* Same chip as the policy list: the family, in the two
+                  letters the name itself uses. A step row names a policy but
+                  not its type, which meant reading a flow told you the order
+                  of things and nothing about what they do. */}
+              {(() => {
+                const stepPolicy = proxy.policies.find((p) => p.name === step.policyName);
+                if (!stepPolicy) return null;
+                const meta = policyTypes.find((t) => t.key === stepPolicy.type);
+                return (
+                  <span
+                    className="policy-cat"
+                    data-cat={policyCategory(stepPolicy.type, meta?.category)}
+                    title={meta?.label || stepPolicy.type}
+                  >
+                    {policyAbbr(stepPolicy.type)}
+                  </span>
+                );
+              })()}
               {availablePolicies.includes(step.policyName) ? (
                 <button
                   type="button"

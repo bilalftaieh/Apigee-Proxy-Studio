@@ -11,7 +11,7 @@ function CallerRow({ caller }: { caller: SharedFlowCaller }) {
         {caller.policyName}
       </span>
       {!caller.attached && (
-        <span className="template-badge" style={{ color: 'var(--warning)', background: 'rgba(255, 180, 84, 0.12)', borderColor: 'var(--warning)' }} title="This FlowCallout policy exists but is not wired into any Step, so it never runs">
+        <span className="template-badge" style={{ color: 'var(--warning)', background: 'var(--warning-soft)', borderColor: 'var(--warning)' }} title="This FlowCallout policy exists but is not wired into any Step, so it never runs">
           not attached
         </span>
       )}
@@ -33,7 +33,7 @@ export function SharedFlowUsagePanel({ usage }: { usage: SharedFlowAnalysis }) {
   return (
     <div>
       {missing.length > 0 && (
-        <div className="card" style={{ borderColor: 'rgba(242, 85, 92, 0.4)' }}>
+        <div className="card" style={{ borderColor: 'var(--error)' }}>
           <h4 className="card-title" style={{ color: 'var(--error)' }}>
             <Icon name="unlink" size={15} /> Called but not defined here ({missing.length})
           </h4>
@@ -60,7 +60,7 @@ export function SharedFlowUsagePanel({ usage }: { usage: SharedFlowAnalysis }) {
       )}
 
       {emptyInUse.length > 0 && (
-        <div className="card" style={{ borderColor: 'rgba(255, 180, 84, 0.4)' }}>
+        <div className="card" style={{ borderColor: 'var(--warning)' }}>
           <h4 className="card-title" style={{ color: 'var(--warning)' }}>
             <Icon name="package-open" size={15} /> Empty, but called ({emptyInUse.length})
           </h4>
@@ -85,7 +85,7 @@ export function SharedFlowUsagePanel({ usage }: { usage: SharedFlowAnalysis }) {
       )}
 
       {cycles.length > 0 && (
-        <div className="card" style={{ borderColor: 'rgba(242, 85, 92, 0.4)' }}>
+        <div className="card" style={{ borderColor: 'var(--error)' }}>
           <h4 className="card-title" style={{ color: 'var(--error)' }}>
             <Icon name="refresh-cw" size={15} /> Call cycles ({cycles.length})
           </h4>
@@ -140,7 +140,7 @@ export function SharedFlowUsagePanel({ usage }: { usage: SharedFlowAnalysis }) {
               <div className="section-label" style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span className="mono">{f.name}</span>
                 {!f.definedLocally && (
-                  <span className="template-badge" style={{ color: 'var(--error)', background: 'rgba(242, 85, 92, 0.12)', borderColor: 'var(--error)' }}>
+                  <span className="template-badge" style={{ color: 'var(--error)', background: 'var(--error-soft)', borderColor: 'var(--error)' }}>
                     not in workspace
                   </span>
                 )}

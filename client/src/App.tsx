@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useStore } from './store/useStore';
 import { useSharedFlowStore } from './store/useSharedFlowStore';
+import { AppBar } from './components/AppBar';
 import { Sidebar } from './components/Sidebar';
 import { EmptyState } from './components/EmptyState';
 import { Toasts } from './components/Toasts';
@@ -144,18 +145,21 @@ export default function App() {
   }, []);
 
   return (
-    <div className="shell" data-sidebar={railCollapsed ? 'collapsed' : undefined}>
-      <Sidebar collapsed={railCollapsed} canToggle={!narrowShell} />
-      <div className="main">
-        {workspaceOpen ? (
-          <WorkspaceView />
-        ) : currentSharedFlow ? (
-          <SharedFlowEditor />
-        ) : currentProxy ? (
-          <ProxyEditor />
-        ) : (
-          <EmptyState />
-        )}
+    <div className="app-frame">
+      <AppBar canToggleSidebar={!narrowShell} />
+      <div className="shell" data-sidebar={railCollapsed ? 'collapsed' : undefined}>
+        <Sidebar collapsed={railCollapsed} />
+        <div className="main">
+          {workspaceOpen ? (
+            <WorkspaceView />
+          ) : currentSharedFlow ? (
+            <SharedFlowEditor />
+          ) : currentProxy ? (
+            <ProxyEditor />
+          ) : (
+            <EmptyState />
+          )}
+        </div>
       </div>
       <Toasts />
       <SuggestionBanner />

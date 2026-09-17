@@ -1,5 +1,6 @@
 import { useStore } from '../store/useStore';
 import { Icon } from './Icon';
+import { policyCategory } from '../lib/policyCategory';
 
 export function SuggestionBanner() {
   const suggestion = useStore((s) => s.suggestion);
@@ -23,7 +24,10 @@ export function SuggestionBanner() {
           const type = policyTypes.find((t) => t.key === s.type);
           return (
             <div className="suggestion-item" key={s.type}>
-              <div className="policy-card-icon" style={{ background: `${type?.accent || '#8b93a7'}22`, color: type?.accent || '#8b93a7' }}>
+              {/* Category rather than the per-type accent: those hexes are
+                  dark-theme values, and an 0x22 alpha of one on white is a
+                  wash you cannot see. */}
+              <div className="policy-card-icon" data-cat={policyCategory(s.type, type?.category)}>
                 <Icon name={type?.icon || 'puzzle'} size={14} />
               </div>
               <div style={{ minWidth: 0, flex: 1 }}>

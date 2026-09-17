@@ -36,6 +36,7 @@ export function SharedFlowStepsPanel() {
           onRemove={removeStep}
           onMove={moveStep}
           onJumpToPolicy={jumpToPolicy}
+          resolvePolicyType={(name) => sharedFlow.policies.find((p) => p.name === name)?.type}
         />
       </div>
     </div>

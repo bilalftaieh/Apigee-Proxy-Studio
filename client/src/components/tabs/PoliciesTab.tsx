@@ -15,6 +15,7 @@ import { lintPolicyXml } from '../../lib/fastLint';
 import { EDITOR_OPTIONS, attachLayoutFallback } from '../../lib/monacoLayout';
 import { policyReferencesResource, resourceUri } from '../../lib/resourceTypes';
 import { buildPolicyAttachments, GROUP_LABELS, GROUP_ORDER, type AttachmentGroup } from '../../lib/policyAttachment';
+import { policyCategory, policyAbbr } from '../../lib/policyCategory';
 
 export function PoliciesTab() {
   const proxy = useStore((s) => s.currentProxy)!;
@@ -230,15 +231,22 @@ export function PoliciesTab() {
                   <div
                     key={p.id}
                     className={`policy-list-item ${selected?.id === p.id ? 'active' : ''}`}
+                    data-cat={policyCategory(p.type, type?.category)}
                     onClick={() => setSelectedPolicyId(p.id)}
                   >
-                    {/* The colour encodes category and always has; naming it
-                        here is what stops the colour being the only carrier. */}
+                    {/* Colour carries the policy family and nothing else, so a
+                        glance down the list says what kind of work happens
+                        where. The two letters are the same prefix the studio
+                        generates names from, so the chip and the name agree —
+                        and they, not the colour, are what actually names the
+                        category for anyone who can't separate the hues. */}
                     <span
-                      className="policy-dot"
-                      style={{ background: type?.accent || '#8b93a7' }}
+                      className="policy-cat"
+                      data-cat={policyCategory(p.type, type?.category)}
                       title={type?.category ? `${type.category} policy` : undefined}
-                    />
+                    >
+                      {policyAbbr(p.type)}
+                    </span>
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div className="policy-list-item-name mono">{p.name}</div>
                       <div className="policy-list-item-type">

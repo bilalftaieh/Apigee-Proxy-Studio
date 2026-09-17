@@ -1,7 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { useSharedFlowStore } from '../store/useSharedFlowStore';
-import { useUiStore } from '../store/useUiStore';
 import { useWorkspaceStore } from '../store/useWorkspaceStore';
 import { Icon } from './Icon';
 import { NewProxyModal } from './NewProxyModal';
@@ -13,10 +12,11 @@ import type { Template } from '../types/proxy';
 
 /**
  * `collapsed` is the rail state as decided by App — the user's preference or a
- * window too narrow for the full sidebar. `canToggle` is false in the second
- * case, where the toggle would appear to do nothing.
+ * window too narrow for the full sidebar. The toggle that sets it lives in the
+ * AppBar now, along with the mark and the global search, so this is only the
+ * list of things you can open.
  */
-export function Sidebar({ collapsed = false, canToggle = true }: { collapsed?: boolean; canToggle?: boolean }) {
+export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
   const proxies = useStore((s) => s.proxies);
   const templates = useStore((s) => s.templates);
   const currentProxy = useStore((s) => s.currentProxy);
@@ -35,8 +35,6 @@ export function Sidebar({ collapsed = false, canToggle = true }: { collapsed?: b
   const duplicateSharedFlow = useSharedFlowStore((s) => s.duplicateSharedFlow);
   const closeSharedFlow = useSharedFlowStore((s) => s.closeSharedFlow);
 
-  const openCommandPalette = useUiStore((s) => s.openCommandPalette);
-  const toggleSidebar = useUiStore((s) => s.toggleSidebar);
   const workspaceOpen = useWorkspaceStore((s) => s.open);
   const openWorkspace = useWorkspaceStore((s) => s.openWorkspace);
   const closeWorkspace = useWorkspaceStore((s) => s.closeWorkspace);
@@ -95,44 +93,10 @@ export function Sidebar({ collapsed = false, canToggle = true }: { collapsed?: b
 
   return (
     <div className="sidebar">
-      <div className="brand">
-        <div className="brand-mark">
-          <Icon name="puzzle" size={18} color="#06120e" />
-        </div>
-        <div className="brand-text">
-          <h1>Apigee Proxy Studio</h1>
-          <span>Build. Bundle. Import.</span>
-        </div>
-        {/* The palette is keyboard-first, so it needs somewhere visible to be
-            discovered from. The search box below is a different thing — it
-            filters this list in place. In the rail it is the only way left to
-            search, so it stays while the search box goes. */}
-        <button
-          className="brand-cmdk"
-          onClick={openCommandPalette}
-          aria-label="Open command palette"
-          title="Command palette (Ctrl+K)"
-        >
-          <Icon name="command" size={12} />
-          <span className="brand-cmdk-key">K</span>
-        </button>
-        {canToggle && (
-          <button
-            className="icon-btn sidebar-toggle"
-            onClick={toggleSidebar}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            aria-expanded={!collapsed}
-            title={`${collapsed ? 'Expand' : 'Collapse'} sidebar (Ctrl+B)`}
-          >
-            <Icon name={collapsed ? 'chevron-right' : 'chevron-left'} size={15} />
-          </button>
-        )}
-      </div>
-
       {!collapsed && (
         <div className="search-box">
           <Icon name="search" size={14} />
-          <input placeholder="Search proxies…" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <input placeholder="Filter" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
       )}
 

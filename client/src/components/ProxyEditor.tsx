@@ -183,10 +183,10 @@ export function ProxyEditor() {
                   className="tab-count"
                   style={
                     lintResult.errorCount > 0
-                      ? { color: 'var(--error)', background: 'rgba(242, 85, 92, 0.15)' }
+                      ? { color: 'var(--error-ink)', background: 'var(--error-soft)' }
                       : lintResult.warningCount > 0
-                      ? { color: 'var(--warning)', background: 'rgba(255, 180, 84, 0.15)' }
-                      : { color: 'var(--success)', background: 'rgba(47, 212, 143, 0.15)' }
+                      ? { color: 'var(--warning-ink)', background: 'var(--warning-soft)' }
+                      : { color: 'var(--success-ink)', background: 'var(--success-soft)' }
                   }
                 >
                   {lintResult.errorCount > 0 ? lintResult.errorCount : lintResult.warningCount > 0 ? lintResult.warningCount : '✓'}

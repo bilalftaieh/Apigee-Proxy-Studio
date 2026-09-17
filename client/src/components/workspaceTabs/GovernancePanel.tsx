@@ -71,23 +71,24 @@ export function GovernancePanel({ governance, stats }: { governance: GovernanceA
           </button>
         </div>
 
-        <div style={{ display: 'flex', gap: 18, marginTop: 14, flexWrap: 'wrap' }}>
+        {/* One strip, not four 20px stat numbers. Counts this small are a
+            summary you read once, not the headline of the screen — and at 20px
+            bold they outweighed the findings underneath them. */}
+        <div className="count-strip">
           {(['error', 'warning', 'info'] as GovernanceSeverity[]).map((sev) => {
             const n = governance.findings.filter((f) => f.severity === sev).length;
             return (
-              <div key={sev} style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                <span style={{ fontSize: 20, fontWeight: 700, color: n ? SEVERITY_COLOR[sev] : 'var(--text-3)' }}>{n}</span>
-                <span className="field-hint">
-                  {sev}
-                  {n === 1 ? '' : 's'}
-                </span>
-              </div>
+              <span key={sev} className="count-strip-item" data-severity={n ? sev : undefined}>
+                <span className="count-strip-n">{n}</span>
+                {sev}
+                {n === 1 ? '' : 's'}
+              </span>
             );
           })}
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-            <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--success)' }}>{groups.length - failing.length}</span>
-            <span className="field-hint">rules passing</span>
-          </div>
+          <span className="count-strip-item" data-severity="ok">
+            <span className="count-strip-n">{groups.length - failing.length}</span>
+            rules passing
+          </span>
         </div>
       </div>
 

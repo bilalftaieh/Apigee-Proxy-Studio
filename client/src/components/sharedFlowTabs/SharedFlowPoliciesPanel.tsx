@@ -3,6 +3,7 @@ import Editor from '@monaco-editor/react';
 import { useStore } from '../../store/useStore';
 import { useSharedFlowStore } from '../../store/useSharedFlowStore';
 import { Icon } from '../Icon';
+import { policyCategory, policyAbbr } from '../../lib/policyCategory';
 import { AddPolicyModal } from '../AddPolicyModal';
 import { ConfirmModal } from '../ConfirmModal';
 import { FlowCalloutHelper } from '../FlowCalloutHelper';
@@ -118,13 +119,16 @@ export function SharedFlowPoliciesPanel() {
                     <div
                       key={p.id}
                       className={`policy-list-item ${selected?.id === p.id ? 'active' : ''}`}
+                      data-cat={policyCategory(p.type, type?.category)}
                       onClick={() => setSelectedPolicyId(p.id)}
                     >
                       <span
-                        className="policy-dot"
-                        style={{ background: type?.accent || '#8b93a7' }}
+                        className="policy-cat"
+                        data-cat={policyCategory(p.type, type?.category)}
                         title={type?.category ? `${type.category} policy` : undefined}
-                      />
+                      >
+                        {policyAbbr(p.type)}
+                      </span>
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div className="policy-list-item-name mono">{p.name}</div>
                         <div className="policy-list-item-type">
