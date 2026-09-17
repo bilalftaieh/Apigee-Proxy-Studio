@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../../store/useStore';
 import { Icon } from '../Icon';
 import { effectiveTarget } from '../../lib/proxyEnvironment';
@@ -293,6 +293,41 @@ export function FlowDiagramTab() {
   const nodeRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [paths, setPaths] = useState<EdgePath[]>([]);
 
+  /**
+   * The canvas has a 900px min-width and the card scrolls to reach it, but the
+   * only sign of that was a 10px scrollbar at the bottom of a tall card — easy
+   * to miss, and the target node simply appeared to stop at the right edge.
+   * Same treatment as the tab row: a fade and an arrow on whichever side still
+   * has something to show. Both sit on the wrapper, outside the node that PNG
+   * export rasterises, so an exported diagram never picks up a fade.
+   */
+  const [edges, setEdges] = useState({ left: false, right: false });
+
+  const measureEdges = useCallback(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    // 1px slack: fractional scroll positions never settle exactly on 0 / max.
+    setEdges({ left: el.scrollLeft > 1, right: el.scrollLeft < max - 1 });
+  }, []);
+
+  useLayoutEffect(() => {
+    const el = cardRef.current;
+    const canvas = containerRef.current;
+    if (!el || !canvas) return;
+    measureEdges();
+    // The card resizes with the window; the canvas resizes when a flow or a
+    // target is added, which doesn't resize the card.
+    const ro = new ResizeObserver(measureEdges);
+    ro.observe(el);
+    ro.observe(canvas);
+    return () => ro.disconnect();
+  }, [measureEdges]);
+
+  const nudgeCanvas = (direction: -1 | 1) => {
+    cardRef.current?.scrollBy({ left: direction * 320, behavior: 'smooth' });
+  };
+
   const [tracing, setTracing] = useState(false);
   const [traceVerb, setTraceVerb] = useState<string>('GET');
   const [tracePath, setTracePath] = useState('/');
@@ -500,145 +535,167 @@ export function FlowDiagramTab() {
         </div>
       )}
 
-      <div className="card fd-card" ref={cardRef}>
-        <div className={`fd-canvas ${tracing ? 'fd-canvas-tracing' : ''}`} ref={containerRef}>
-          <svg className="fd-edges">
-            <defs>
-              <marker id="fd-arrow-neutral" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-                <path d="M0,0 L6,3 L0,6 Z" fill="var(--text-3)" />
-              </marker>
-              <marker id="fd-arrow-route" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-                <path d="M0,0 L6,3 L0,6 Z" fill="var(--accent-teal)" />
-              </marker>
-              <marker id="fd-arrow-condition" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-                <path d="M0,0 L6,3 L0,6 Z" fill="var(--accent-purple)" />
-              </marker>
-              <marker id="fd-arrow-backend" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-                <path d="M0,0 L6,3 L0,6 Z" fill="var(--accent-blue)" />
-              </marker>
-            </defs>
-            {paths.map((p) => (
-              <g key={p.id} className={tracing ? (tracedEdges.has(p.id) ? 'fd-edge-traced' : 'fd-edge-muted') : undefined}>
-                {p.title && <title>{p.title}</title>}
-                <path d={p.d} className={`fd-edge-path fd-edge-${p.tone}`} markerEnd={`url(#fd-arrow-${p.tone})`} />
-                {/* Second pass over the same curve: a dashed overlay that runs
-                    along the traced route, so the direction of travel reads at
-                    a glance instead of having to follow the arrowheads. */}
-                {tracing && tracedEdges.has(p.id) && <path d={p.d} className="fd-edge-flow" />}
-                {p.label && (
-                  <text x={p.labelX} y={p.labelY - 8} textAnchor="middle" className="fd-edge-label">
-                    {p.label}
-                  </text>
-                )}
-              </g>
-            ))}
-          </svg>
-
-          <div className="fd-col fd-col-client">
-            <div className={`fd-node fd-node-client ${nodeClass('client')}`} ref={setNodeRef('client')}>
-              <Icon name="globe" size={16} />
-              <span>Client</span>
-            </div>
-          </div>
-
-          <div className="fd-col fd-col-proxy">
-            <div
-              className={`fd-node fd-node-proxy ${nodeClass('proxy')}`}
-              ref={setNodeRef('proxy')}
-              onClick={() => setActiveTab('proxyEndpoint')}
-              title="Open Proxy Endpoint tab"
-            >
-              <div className="fd-node-head">
-                <Icon name="signpost" size={14} />
-                <span>{proxy.proxyEndpointName || 'default'}</span>
-                <LintDot severity={proxyLintSeverity} />
-              </div>
-              <div className="fd-node-sub mono">{proxy.basePath || '/'}</div>
-              <FlowStage icon="arrow-down-to-line" title="PreFlow" request={proxy.preFlow.request} response={proxy.preFlow.response} />
-              <ConditionalFlowsMini
-                flows={proxy.flows}
-                matchedFlowId={trace?.proxyFlow?.id ?? null}
-                tracing={tracing}
-                onTrace={startTrace}
-              />
-              <FlowStage icon="arrow-up-from-line" title="PostFlow" request={proxy.postFlow.request} response={proxy.postFlow.response} />
-              {/* Response-only, and it runs after the client already has the
-                  response — so it's shown last, with no request column. */}
-              {(proxy.postClientFlow?.response?.length ?? 0) > 0 && (
-                <FlowStage
-                  icon="send-horizontal"
-                  title="PostClientFlow"
-                  request={[]}
-                  response={proxy.postClientFlow!.response}
-                />
-              )}
-              <FaultRuleMini faultRules={proxy.faultRules} />
-            </div>
-          </div>
-
-          <div className="fd-col fd-col-targets">
-            {displayTargets.map((t) => {
-              const lintSeverity = worstLintSeverity(allReferencedPolicyNames(t), proxy.policies);
-              const overridden = !!selectedEnv?.targetOverrides?.[t.id];
-              return (
-                <div
-                  className={`fd-node fd-node-target ${nodeClass(`target-${t.id}`)}`}
-                  key={t.id}
-                  ref={setNodeRef(`target-${t.id}`)}
-                  onClick={() => {
-                    setSelectedTargetId(t.id);
-                    setActiveTab('targetEndpoint');
-                  }}
-                  title="Open Target Endpoint tab"
-                >
-                  <div className="fd-node-head">
-                    <Icon name="server" size={14} />
-                    <span>{t.name}</span>
-                    {overridden && (
-                      <span className="fd-env-badge" title={`Overridden for environment "${selectedEnv!.name}"`}>
-                        {selectedEnv!.name}
-                      </span>
-                    )}
-                    <LintDot severity={lintSeverity} />
-                  </div>
-                  <FlowStage icon="arrow-down-to-line" title="PreFlow" request={t.preFlow.request} response={t.preFlow.response} />
-                  <ConditionalFlowsMini
-                    flows={t.flows}
-                    matchedFlowId={trace?.target?.id === t.id ? trace?.targetFlow?.id ?? null : null}
-                    tracing={tracing}
-                    onTrace={startTrace}
-                  />
-                  <FlowStage icon="arrow-up-from-line" title="PostFlow" request={t.postFlow.request} response={t.postFlow.response} />
-                  {(t.eventFlow?.response?.length ?? 0) > 0 && (
-                    <FlowStage icon="radio-tower" title="EventFlow (SSE)" request={[]} response={t.eventFlow!.response} />
+      <div className="fd-card-wrap" data-edge-left={edges.left || undefined} data-edge-right={edges.right || undefined}>
+        <div className="card fd-card" ref={cardRef} onScroll={measureEdges}>
+          <div className={`fd-canvas ${tracing ? 'fd-canvas-tracing' : ''}`} ref={containerRef}>
+            <svg className="fd-edges">
+              <defs>
+                <marker id="fd-arrow-neutral" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                  <path d="M0,0 L6,3 L0,6 Z" fill="var(--text-3)" />
+                </marker>
+                <marker id="fd-arrow-route" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                  <path d="M0,0 L6,3 L0,6 Z" fill="var(--accent-teal)" />
+                </marker>
+                <marker id="fd-arrow-condition" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                  <path d="M0,0 L6,3 L0,6 Z" fill="var(--accent-purple)" />
+                </marker>
+                <marker id="fd-arrow-backend" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                  <path d="M0,0 L6,3 L0,6 Z" fill="var(--accent-blue)" />
+                </marker>
+              </defs>
+              {paths.map((p) => (
+                <g key={p.id} className={tracing ? (tracedEdges.has(p.id) ? 'fd-edge-traced' : 'fd-edge-muted') : undefined}>
+                  {p.title && <title>{p.title}</title>}
+                  <path d={p.d} className={`fd-edge-path fd-edge-${p.tone}`} markerEnd={`url(#fd-arrow-${p.tone})`} />
+                  {/* Second pass over the same curve: a dashed overlay that runs
+                      along the traced route, so the direction of travel reads at
+                      a glance instead of having to follow the arrowheads. */}
+                  {tracing && tracedEdges.has(p.id) && <path d={p.d} className="fd-edge-flow" />}
+                  {p.label && (
+                    <text x={p.labelX} y={p.labelY - 8} textAnchor="middle" className="fd-edge-label">
+                      {p.label}
+                    </text>
                   )}
-                  <FaultRuleMini faultRules={t.faultRules} />
-                </div>
-              );
-            })}
-            {missingTargetNames.map((name) => (
-              <div className="fd-node fd-node-ghost" key={name} ref={setNodeRef(`missing-${name}`)}>
-                <Icon name="triangle-alert" size={14} />
-                <span>"{name}" not found</span>
-              </div>
-            ))}
-            {proxy.targets.length === 0 && missingTargetNames.length === 0 && (
-              <div className="fd-node fd-node-ghost">
-                <Icon name="server-off" size={14} />
-                <span>No targets yet</span>
-              </div>
-            )}
-          </div>
+                </g>
+              ))}
+            </svg>
 
-          <div className="fd-col fd-col-backend">
-            {displayTargets.map((t) => (
-              <div className={`fd-node fd-node-backend ${nodeClass(`backend-${t.id}`)}`} key={t.id} ref={setNodeRef(`backend-${t.id}`)}>
-                <Icon name="database" size={13} />
-                <span className="mono">{backendLabel(t)}</span>
+            <div className="fd-col fd-col-client">
+              <div className={`fd-node fd-node-client ${nodeClass('client')}`} ref={setNodeRef('client')}>
+                <Icon name="globe" size={16} />
+                <span>Client</span>
               </div>
-            ))}
+            </div>
+
+            <div className="fd-col fd-col-proxy">
+              <div
+                className={`fd-node fd-node-proxy ${nodeClass('proxy')}`}
+                ref={setNodeRef('proxy')}
+                onClick={() => setActiveTab('proxyEndpoint')}
+                title="Open Proxy Endpoint tab"
+              >
+                <div className="fd-node-head">
+                  <Icon name="signpost" size={14} />
+                  <span>{proxy.proxyEndpointName || 'default'}</span>
+                  <LintDot severity={proxyLintSeverity} />
+                </div>
+                <div className="fd-node-sub mono">{proxy.basePath || '/'}</div>
+                <FlowStage icon="arrow-down-to-line" title="PreFlow" request={proxy.preFlow.request} response={proxy.preFlow.response} />
+                <ConditionalFlowsMini
+                  flows={proxy.flows}
+                  matchedFlowId={trace?.proxyFlow?.id ?? null}
+                  tracing={tracing}
+                  onTrace={startTrace}
+                />
+                <FlowStage icon="arrow-up-from-line" title="PostFlow" request={proxy.postFlow.request} response={proxy.postFlow.response} />
+                {/* Response-only, and it runs after the client already has the
+                    response — so it's shown last, with no request column. */}
+                {(proxy.postClientFlow?.response?.length ?? 0) > 0 && (
+                  <FlowStage
+                    icon="send-horizontal"
+                    title="PostClientFlow"
+                    request={[]}
+                    response={proxy.postClientFlow!.response}
+                  />
+                )}
+                <FaultRuleMini faultRules={proxy.faultRules} />
+              </div>
+            </div>
+
+            <div className="fd-col fd-col-targets">
+              {displayTargets.map((t) => {
+                const lintSeverity = worstLintSeverity(allReferencedPolicyNames(t), proxy.policies);
+                const overridden = !!selectedEnv?.targetOverrides?.[t.id];
+                return (
+                  <div
+                    className={`fd-node fd-node-target ${nodeClass(`target-${t.id}`)}`}
+                    key={t.id}
+                    ref={setNodeRef(`target-${t.id}`)}
+                    onClick={() => {
+                      setSelectedTargetId(t.id);
+                      setActiveTab('targetEndpoint');
+                    }}
+                    title="Open Target Endpoint tab"
+                  >
+                    <div className="fd-node-head">
+                      <Icon name="server" size={14} />
+                      <span>{t.name}</span>
+                      {overridden && (
+                        <span className="fd-env-badge" title={`Overridden for environment "${selectedEnv!.name}"`}>
+                          {selectedEnv!.name}
+                        </span>
+                      )}
+                      <LintDot severity={lintSeverity} />
+                    </div>
+                    <FlowStage icon="arrow-down-to-line" title="PreFlow" request={t.preFlow.request} response={t.preFlow.response} />
+                    <ConditionalFlowsMini
+                      flows={t.flows}
+                      matchedFlowId={trace?.target?.id === t.id ? trace?.targetFlow?.id ?? null : null}
+                      tracing={tracing}
+                      onTrace={startTrace}
+                    />
+                    <FlowStage icon="arrow-up-from-line" title="PostFlow" request={t.postFlow.request} response={t.postFlow.response} />
+                    {(t.eventFlow?.response?.length ?? 0) > 0 && (
+                      <FlowStage icon="radio-tower" title="EventFlow (SSE)" request={[]} response={t.eventFlow!.response} />
+                    )}
+                    <FaultRuleMini faultRules={t.faultRules} />
+                  </div>
+                );
+              })}
+              {missingTargetNames.map((name) => (
+                <div className="fd-node fd-node-ghost" key={name} ref={setNodeRef(`missing-${name}`)}>
+                  <Icon name="triangle-alert" size={14} />
+                  <span>"{name}" not found</span>
+                </div>
+              ))}
+              {proxy.targets.length === 0 && missingTargetNames.length === 0 && (
+                <div className="fd-node fd-node-ghost">
+                  <Icon name="server-off" size={14} />
+                  <span>No targets yet</span>
+                </div>
+              )}
+            </div>
+
+            <div className="fd-col fd-col-backend">
+              {displayTargets.map((t) => (
+                <div className={`fd-node fd-node-backend ${nodeClass(`backend-${t.id}`)}`} key={t.id} ref={setNodeRef(`backend-${t.id}`)}>
+                  <Icon name="database" size={13} />
+                  <span className="mono">{backendLabel(t)}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
+        {/* Redundant with scrolling or dragging the canvas, so kept out of the
+            tab order and the a11y tree — same as the tab row's arrows. */}
+        <button
+          type="button"
+          className="fd-scroll-arrow fd-scroll-arrow-left"
+          tabIndex={-1}
+          aria-hidden="true"
+          onClick={() => nudgeCanvas(-1)}
+        >
+          <Icon name="chevron-left" size={15} />
+        </button>
+        <button
+          type="button"
+          className="fd-scroll-arrow fd-scroll-arrow-right"
+          tabIndex={-1}
+          aria-hidden="true"
+          onClick={() => nudgeCanvas(1)}
+        >
+          <Icon name="chevron-right" size={15} />
+        </button>
       </div>
 
       {trace && <TraceTimeline trace={trace} onOpenPolicy={openPolicy} />}
