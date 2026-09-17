@@ -36,12 +36,12 @@ export function NewProxyModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <Modal title="New Proxy" onClose={onClose}>
+    <Modal title="Create new proxy" onClose={onClose}>
       <div className="field" style={{ marginBottom: 14 }}>
-        <label>Proxy Name</label>
+        <label>Proxy name</label>
         <input
           autoFocus
-          placeholder="my-new-proxy"
+          placeholder="e.g., payment-service-api"
           value={name}
           onChange={(e) => {
             setName(e.target.value);
@@ -49,33 +49,42 @@ export function NewProxyModal({ onClose }: { onClose: () => void }) {
           }}
           onKeyDown={(e) => e.key === 'Enter' && submit()}
         />
+        <div className="field-hint">Lowercase letters, numbers, and hyphens only. Max 49 characters.</div>
       </div>
       <div className="field" style={{ marginBottom: 14 }}>
-        <label>Base Path</label>
+        <label>Base path</label>
         <input
-          placeholder="/my-new-proxy"
+          placeholder="e.g., /payments/v1"
           value={basePath}
           onChange={(e) => {
             setBasePathTouched(true);
             setBasePath(e.target.value);
           }}
         />
+        <div className="field-hint">Must start with /. Used to route requests to this proxy.</div>
       </div>
       <div className="field">
-        <label>Description</label>
+        <label>Description (optional)</label>
         <textarea
-          placeholder="What does this proxy do?"
+          placeholder="Briefly describe the proxy's purpose and target backend"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
       </div>
-      {error && <p style={{ color: 'var(--error)', fontSize: 12, marginTop: 10 }}>{error}</p>}
+      {error && <p style={{ color: 'var(--error-ink)', fontSize: 12, marginTop: 10 }}>{error}</p>}
       <div className="modal-footer">
         <button className="btn btn-ghost" onClick={onClose}>
           Cancel
         </button>
         <button className="btn btn-primary" disabled={busy} onClick={submit}>
-          {busy ? <span className="spinner" /> : 'Create Proxy'}
+          {busy ? (
+            <>
+              <span className="spinner" />
+              Creating proxy...
+            </>
+          ) : (
+            'Create proxy'
+          )}
         </button>
       </div>
     </Modal>

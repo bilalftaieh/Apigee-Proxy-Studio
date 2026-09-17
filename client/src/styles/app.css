@@ -735,11 +735,12 @@
 
 .proxy-header-top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  min-height: 48px;
+  min-height: 56px;
   flex-wrap: wrap;
+  padding-top: 12px;
 }
 
 /* The half that has to give. Without min-width:0 a flex item refuses to shrink
@@ -757,13 +758,15 @@
   align-items: center;
   gap: 10px;
   min-width: 0;
+  margin-bottom: 6px;
 }
 
 .proxy-title {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 500;
   letter-spacing: -0.012em;
   margin: 0;
+  color: var(--text-0);
   /* Truncates rather than wraps — the full name is in the title attribute, and
      the sidebar row it was opened from still shows it. */
   min-width: 0;
@@ -775,12 +778,13 @@
 .proxy-basepath {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--text-1);
+  font-weight: 400;
+  color: var(--text-2);
   background: var(--bg-3);
   border: 1px solid var(--border);
-  padding: 2px 6px;
+  padding: 3px 7px;
   border-radius: var(--radius-sm);
-  height: 20px;
+  height: 22px;
   /* A base path is short and is the thing that identifies the proxy in Apigee,
      so it holds its width and the name gives way first. */
   flex-shrink: 0;
@@ -793,8 +797,10 @@
 .proxy-desc {
   color: var(--text-2);
   font-size: 12.5px;
-  margin: 2px 0 0;
-  max-width: 640px;
+  margin: 0 0 8px;
+  padding: 0;
+  max-width: 720px;
+  line-height: 1.5;
   /* Two lines, then ellipsis. These descriptions run long, and at the top of
      every tab they were spending the vertical budget that belongs to the
      editor below. */
@@ -880,33 +886,29 @@
 
 /* Segments the row into Design and Verify. aria-hidden and not focusable: the
    tablist's semantics are unchanged, this only tells the eye which half of the
-   row it is looking at. The rule on the left is the divider between groups, so
-   the first label doesn't get one. */
+   row it is looking at. Styled as a proper group label with badge-like appearance. */
 .tab-group-label {
   flex: 0 0 auto;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 9px;
-  padding: 0 9px 0 0;
-  margin-right: 3px;
-  font-size: 9.5px;
-  font-weight: 500;
-  letter-spacing: 0.1em;
+  gap: 6px;
+  padding: 2px 8px;
+  margin: 4px 8px 4px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--text-3);
+  color: var(--text-2);
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   user-select: none;
 }
 .tab-group-label::before {
-  content: '';
-  width: 1px;
-  height: 18px;
-  background: var(--border-strong);
+  content: none;
 }
 .tab-group-label[data-first] {
-  padding-left: 0;
-}
-.tab-group-label[data-first]::before {
-  display: none;
+  margin-left: 0;
 }
 
 .tabs-wrap[data-edge-right] .tabs {
@@ -1840,9 +1842,9 @@
 .policy-editor-head input {
   background: transparent;
   border: none;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-0);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-1);
   font-family: var(--font-mono);
   outline: none;
   border-bottom: 1px dashed transparent;
@@ -1850,6 +1852,7 @@
 }
 .policy-editor-head input:focus {
   border-bottom-color: var(--accent-blue);
+  color: var(--text-0);
 }
 
 .monaco-wrap {
@@ -3390,12 +3393,34 @@
   cursor: pointer;
   user-select: none;
 }
-.checkbox-row input[type='checkbox'] {
-  width: 14px;
-  height: 14px;
+/* Global checkbox styling - GCP Apigee style */
+input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
   accent-color: var(--accent-blue);
   cursor: pointer;
+  margin: 0;
   flex-shrink: 0;
+}
+
+input[type='checkbox']:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
+}
+
+/* Global radio button styling - GCP Apigee style */
+input[type='radio'] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-blue);
+  cursor: pointer;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+input[type='radio']:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
 }
 .checkbox-row .field-hint {
   margin: 0;
