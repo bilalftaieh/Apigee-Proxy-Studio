@@ -22,33 +22,40 @@ export function NewSharedFlowModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <Modal title="New Shared Flow" onClose={onClose}>
+    <Modal title="Create new shared flow" onClose={onClose}>
       <div className="field" style={{ marginBottom: 14 }}>
-        <label>Shared Flow Name</label>
+        <label>Shared flow name</label>
         <input
           autoFocus
-          placeholder="oauth-v2-shared-flow"
+          placeholder="e.g., oauth-v2-shared-flow"
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && submit()}
         />
-        <span className="field-hint">Becomes the .zip filename and root SharedFlowBundle name.</span>
+        <div className="field-hint">Lowercase letters, numbers, and hyphens only. Becomes the .zip filename and root SharedFlowBundle name.</div>
       </div>
       <div className="field">
-        <label>Description</label>
+        <label>Description (optional)</label>
         <textarea
-          placeholder="What does this shared flow do?"
+          placeholder="Briefly describe what this shared flow does"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
       </div>
-      {error && <p style={{ color: 'var(--error)', fontSize: 12, marginTop: 10 }}>{error}</p>}
+      {error && <p style={{ color: 'var(--error-ink)', fontSize: 12, marginTop: 10 }}>{error}</p>}
       <div className="modal-footer">
         <button className="btn btn-ghost" onClick={onClose}>
           Cancel
         </button>
         <button className="btn btn-primary" disabled={busy} onClick={submit}>
-          {busy ? <span className="spinner" /> : 'Create Shared Flow'}
+          {busy ? (
+            <>
+              <span className="spinner" />
+              Creating shared flow...
+            </>
+          ) : (
+            'Create shared flow'
+          )}
         </button>
       </div>
     </Modal>

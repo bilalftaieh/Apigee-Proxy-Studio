@@ -1,21 +1,46 @@
+```gitignore
+# Dependencies
 node_modules/
-dist/
-.claude/
-.DS_Store
-*.log
-# Rotated log files (studio.log.1, .2 …) don't match *.log
-server/logs/
+
+# Build artifacts
+client/dist/
+
+# Environment variables
 .env
 .env.local
-!.env.example
-server/data/*
-!server/data/proxies/
-!server/data/templates/
-server/data/proxies/*
-server/data/templates/*
-!server/data/proxies/.gitkeep
-!server/data/templates/.gitkeep
-server/test-bundles/*.zip
+.env.*
 
-# Cached Apigee reference pages for scripts/generate-policy-schemas.mjs
-scripts/.docs-cache/
+# IDE files
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Compressed files
+*.zip
+*.gz
+*.tar
+*.tgz
+*.bz2
+*.xz
+*.7z
+*.rar
+*.zst
+*.lz4
+*.lzh
+*.cab
+*.arj
+*.rpm
+*.deb
+*.Z
+*.lz
+*.lzo
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.tar.zst
+
+# Preserve existing rule
+*.log
+```
