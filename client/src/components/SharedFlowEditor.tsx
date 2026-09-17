@@ -107,7 +107,7 @@ export function SharedFlowEditor() {
         <TabBar activeKey={activeTab}>
           {TAB_GROUPS.flatMap((g, groupIndex) => [
             <span key={`g-${g.group}`} className="tab-group-label" aria-hidden="true" data-first={groupIndex === 0 || undefined}>
-              {g.group}
+              <span>{g.group}</span>
             </span>,
             ...g.tabs.map((t) => (
             <button

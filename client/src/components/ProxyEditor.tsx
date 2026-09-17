@@ -81,7 +81,13 @@ export function ProxyEditor() {
               <span className="proxy-basepath">{proxy.basePath}</span>
               {dirty && <span className="dirty-dot" title="Unsaved changes" />}
             </div>
-            {proxy.description && <p className="proxy-desc">{proxy.description}</p>}
+            {/* One line in the header; the title attribute carries the rest,
+                and the Overview tab has the field itself. */}
+            {proxy.description && (
+              <p className="proxy-desc" title={proxy.description}>
+                {proxy.description}
+              </p>
+            )}
           </div>
           <div className="header-actions">
             {proxy.environments.length > 0 && (
@@ -159,7 +165,7 @@ export function ProxyEditor() {
         <TabBar activeKey={activeTab}>
           {TAB_GROUPS.flatMap((g, groupIndex) => [
             <span key={`g-${g.group}`} className="tab-group-label" aria-hidden="true" data-first={groupIndex === 0 || undefined}>
-              {g.group}
+              <span>{g.group}</span>
             </span>,
             ...g.tabs.map((t) => (
             <button

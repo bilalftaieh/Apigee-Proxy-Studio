@@ -37,7 +37,7 @@ export function AppBar({ canToggleSidebar }: { canToggleSidebar: boolean }) {
       )}
 
       <div className="appbar-mark" aria-hidden="true">
-        <Icon name="waypoints" size={14} color="#ffffff" />
+        <Icon name="waypoints" size={15} color="#ffffff" />
       </div>
       <span className="appbar-wordmark">Apigee Proxy Studio</span>
       <span className="appbar-divider" aria-hidden="true" />

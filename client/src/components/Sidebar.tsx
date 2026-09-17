@@ -95,7 +95,7 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
     <div className="sidebar">
       {!collapsed && (
         <div className="search-box">
-          <Icon name="search" size={14} />
+          <Icon name="search" size={15} />
           <input placeholder="Filter" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
       )}
@@ -113,7 +113,7 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
               title={collapsed ? 'Workspace Audit' : undefined}
             >
               <span className="nav-item-icon">
-                <Icon name="radar" size={14} />
+                <Icon name="radar" size={16} />
               </span>
               <span className="nav-item-body">
                 <span className="nav-item-title">Workspace Audit</span>
@@ -126,7 +126,7 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
         <div className="sidebar-section">
           <div className="sidebar-section-head">
             <span className="sidebar-section-title">Proxies ({proxies.length})</span>
-            <div style={{ display: 'flex', gap: 2 }}>
+            <div style={{ display: 'flex', gap: 3 }}>
               <input
                 ref={importInputRef}
                 type="file"
@@ -140,10 +140,10 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
                 aria-label="Import a proxy"
                 title="Import from a .zip bundle, an OpenAPI/Swagger spec, or a curl command"
               >
-                <Icon name="upload" size={14} />
+                <Icon name="upload" size={15} />
               </button>
               <button className="icon-btn" onClick={() => setShowNewProxy(true)} aria-label="New proxy">
-                <Icon name="plus" size={15} />
+                <Icon name="plus" size={16} />
               </button>
             </div>
           </div>
@@ -166,7 +166,7 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
                 title={collapsed ? `${p.name} — ${p.basePath}` : undefined}
               >
                 <span className="nav-item-icon">
-                  <Icon name="waypoints" size={14} />
+                  <Icon name="waypoints" size={16} />
                 </span>
                 <span className="nav-item-body">
                   <span className="nav-item-title">{p.name}</span>
@@ -182,7 +182,7 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
                   aria-label={`Duplicate proxy ${p.name}`}
                   title="Duplicate"
                 >
-                  <Icon name="copy" size={13} />
+                  <Icon name="copy" size={14} />
                 </button>
                 <button
                   className="icon-btn icon-btn-danger"
@@ -190,7 +190,7 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
                   aria-label={`Delete proxy ${p.name}`}
                   title="Delete"
                 >
-                  <Icon name="trash-2" size={13} />
+                  <Icon name="trash-2" size={14} />
                 </button>
               </div>
             </div>
@@ -200,7 +200,7 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
         <div className="sidebar-section">
           <div className="sidebar-section-head">
             <span className="sidebar-section-title">Shared Flows ({sharedFlows.length})</span>
-            <div style={{ display: 'flex', gap: 2 }}>
+            <div style={{ display: 'flex', gap: 3 }}>
               <input
                 ref={importSharedFlowInputRef}
                 type="file"
@@ -214,10 +214,10 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
                 aria-label="Import a shared flow"
                 title="Import from a sharedflowbundle .zip"
               >
-                <Icon name="upload" size={14} />
+                <Icon name="upload" size={15} />
               </button>
               <button className="icon-btn" onClick={() => setShowNewSharedFlow(true)} aria-label="New shared flow">
-                <Icon name="plus" size={15} />
+                <Icon name="plus" size={16} />
               </button>
             </div>
           </div>
@@ -238,7 +238,7 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
                 title={collapsed ? sf.name : undefined}
               >
                 <span className="nav-item-icon">
-                  <Icon name="git-branch" size={14} />
+                  <Icon name="git-branch" size={16} />
                 </span>
                 <span className="nav-item-body">
                   <span className="nav-item-title">{sf.name}</span>
@@ -255,7 +255,7 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
                   aria-label={`Duplicate shared flow ${sf.name}`}
                   title="Duplicate"
                 >
-                  <Icon name="copy" size={13} />
+                  <Icon name="copy" size={14} />
                 </button>
                 <button
                   className="icon-btn icon-btn-danger"
@@ -263,7 +263,7 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
                   aria-label={`Delete shared flow ${sf.name}`}
                   title="Delete"
                 >
-                  <Icon name="trash-2" size={13} />
+                  <Icon name="trash-2" size={14} />
                 </button>
               </div>
             </div>
@@ -283,7 +283,7 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
                 title={collapsed ? t.name : undefined}
               >
                 <span className="nav-item-icon">
-                  <Icon name="layout-template" size={14} />
+                  <Icon name="layout-template" size={16} />
                 </span>
                 <span className="nav-item-body">
                   <span className="nav-item-title">{t.name}</span>
@@ -302,7 +302,7 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
                     aria-label={`Delete template ${t.name}`}
                     title="Delete"
                   >
-                    <Icon name="trash-2" size={13} />
+                    <Icon name="trash-2" size={14} />
                   </button>
                 )}
               </div>

@@ -1,11 +1,12 @@
 /* ---------- Shell layout ---------- */
 /* ---------- App bar ----------
-   The band that makes eight tabs and three editors read as one product. Ink,
-   full width, above everything — the mark, the workspace, one global search and
-   the log console. The 2px blue-to-cyan hairline along its very top is the
-   product's signature and the only place the flow gradient appears at strength.
-   It is painted as a background layer rather than a child element so nothing in
-   the row has to make space for it. */
+   The band that makes eight tabs and three editors read as one product. It was
+   an ink band left over from the dark theme: the one element on every screen,
+   and the only one not in the studio's palette — it read as somebody else's
+   chrome bolted on top. It is white now, separated from the shell by the same
+   border every toolbar inside the editors uses, so the frame and the content
+   are visibly one system. The brand mark keeps the gradient; per the theme
+   that is the only place the gradient belongs. */
 .appbar {
   height: var(--appbar-h);
   flex-shrink: 0;
@@ -13,24 +14,19 @@
   align-items: center;
   gap: 10px;
   padding: 0 12px;
-  background-color: var(--appbar-bg);
-  background-image: var(--appbar-accent);
-  background-repeat: no-repeat;
-  background-size: 100% 2px;
-  background-position: top;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.1);
+  background: var(--appbar-bg);
+  /* A rule, not a shadow. The bar is frame, not something floating over the
+     page, and the sidebar and editor toolbars below it divide the same way. */
+  border-bottom: 1px solid var(--appbar-border);
   position: relative;
   z-index: 30;
 }
 
 .appbar-mark {
-  width: 22px;
-  height: 22px;
-  border-radius: 5px;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-lg);
   background: var(--accent-grad);
-  /* The inner top highlight is what makes it read as an object rather than a
-     coloured square. */
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.22);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -38,23 +34,29 @@
 }
 
 .appbar-wordmark {
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 500;
-  letter-spacing: 0.01em;
+  letter-spacing: -0.005em;
   color: var(--appbar-text);
   flex-shrink: 0;
 }
 
 .appbar-divider {
   width: 1px;
-  height: 18px;
+  height: 20px;
   background: var(--appbar-border);
   flex-shrink: 0;
 }
 
+/* The workspace is a value, not a label — it gets the same quiet chip treatment
+   values get everywhere else in the studio rather than sitting as loose text. */
 .appbar-workspace {
-  font-size: 12.5px;
-  color: var(--appbar-text-2);
+  font-size: 12px;
+  color: var(--appbar-text-3);
+  background: var(--appbar-field);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 3px 8px;
   flex-shrink: 0;
   white-space: nowrap;
 }
@@ -70,62 +72,65 @@
 
 /* A button, not an input: it opens the command palette, which is what actually
    searches. A second real input here would be a second place to type the same
-   query. */
+   query. It is styled as the studio's inset well so it reads as a field anyway. */
 .appbar-search {
-  width: min(400px, 100%);
-  height: 28px;
+  width: min(460px, 100%);
+  height: var(--control-h);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   padding: 0 10px;
-  border-radius: 5px;
+  border-radius: var(--radius-md);
   background: var(--appbar-field);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  border: 1px solid transparent;
   color: var(--appbar-text-3);
   cursor: pointer;
   text-align: left;
   transition: background 0.12s ease, border-color 0.12s ease;
 }
 .appbar-search:hover {
-  background: #2b2c30;
-  border-color: rgba(255, 255, 255, 0.12);
+  background: var(--bg-2);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
 }
 
 .appbar-search-label {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
+  font-size: 12.5px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .appbar-key {
-  font-size: 10px;
+  font-size: 10.5px;
   color: var(--appbar-text-3);
-  border: 1px solid var(--appbar-border);
-  border-radius: 3px;
-  padding: 1px 4px;
+  background: var(--bg-2);
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
   flex-shrink: 0;
 }
 
 .appbar-icon-btn {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   flex-shrink: 0;
-  border: none;
-  border-radius: 4px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
   background: transparent;
-  color: var(--appbar-text-2);
+  color: var(--appbar-text-3);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
 .appbar-icon-btn:hover {
-  background: rgba(255, 255, 255, 0.09);
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
   color: var(--appbar-text);
 }
 
@@ -139,7 +144,7 @@
 
 /* ---------- Shell layout ---------- */
 .shell {
-  --sidebar-w: 236px;
+  --sidebar-w: 272px;
   display: grid;
   grid-template-columns: var(--sidebar-w) 1fr;
   flex: 1;
@@ -153,13 +158,13 @@
    labels come back as title attributes, and the command palette (still in the
    brand row) is how you find something by name from here. */
 .shell[data-sidebar='collapsed'] {
-  --sidebar-w: 44px;
+  --sidebar-w: 52px;
 }
 
 /* 288 is generous once the editor has to fit two columns of its own beside it. */
 @media (max-width: 1200px) {
   .shell {
-    --sidebar-w: 216px;
+    --sidebar-w: 244px;
   }
 }
 
@@ -182,19 +187,21 @@
 }
 
 .shell[data-sidebar='collapsed'] .sidebar-scroll {
-  padding: 0 8px 20px;
+  padding: 4px 8px 20px;
 }
 .shell[data-sidebar='collapsed'] .sidebar-section + .sidebar-section {
   /* The section headings are gone, so a rule stands in for them — otherwise
      proxies, shared flows and templates run together as one list of icons. */
-  margin-top: 10px;
-  padding-top: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
   border-top: 1px solid var(--border);
 }
 
 .shell[data-sidebar='collapsed'] .nav-item {
+  min-height: 38px;
   padding: 0;
   border-left-width: 2px;
+  border-radius: var(--radius-md);
   justify-content: center;
 }
 .shell[data-sidebar='collapsed'] .nav-item-main {
@@ -270,25 +277,29 @@
 .sidebar-scroll {
   flex: 1;
   overflow-y: auto;
-  padding: 4px 0 16px;
+  padding: 6px 0 24px;
 }
 
+/* The sections are the sidebar's only structure, so the air between them has
+   to be clearly larger than the air between two rows of one list — otherwise
+   every row reads as a peer of every other and the whole column looks packed. */
 .sidebar-section {
-  margin-top: 10px;
+  margin-top: 18px;
 }
 
 .sidebar-section-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 24px;
-  padding: 0 12px;
+  height: 28px;
+  margin-bottom: 2px;
+  padding: 0 10px 0 12px;
 }
 
 .sidebar-section-title {
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.09em;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-3);
 }
@@ -332,9 +343,12 @@
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  height: var(--row-h);
-  padding: 0 10px 0 9px;
+  gap: 10px;
+  /* Two lines of text, so the row is sized by its content with a floor rather
+     than pinned to the 30px --row-h the dense policy tables use. At that
+     height the title and the subtitle had no room to breathe between them. */
+  min-height: 46px;
+  padding: 6px 8px 6px 9px;
   /* A 3px left edge marks the open item, matching the way policy rows and lint
      findings are marked everywhere else. Transparent here keeps every row on
      the same text baseline whether or not it is the active one. */
@@ -344,10 +358,14 @@
   position: relative;
 }
 
+.nav-item + .nav-item {
+  margin-top: 1px;
+}
+
 .nav-item-main {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 11px;
   flex: 1;
   min-width: 0;
   /* Reset: this is a <button> that has to look like the row it fills. */
@@ -396,6 +414,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  /* Fixed width so the titles of every row line up down the column whatever
+     glyph sits beside them. */
+  width: 18px;
   color: var(--text-2);
   flex-shrink: 0;
 }
@@ -404,6 +425,9 @@
 }
 
 .nav-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
   min-width: 0;
   flex: 1;
 }
@@ -420,22 +444,24 @@
 
 .nav-item-title {
   font-family: var(--font-mono);
-  font-size: 11.5px;
-  font-weight: 400;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.25;
 }
 .nav-item.active .nav-item-title {
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .nav-item-sub {
-  font-size: 10.5px;
+  font-size: 11px;
+  line-height: 1.3;
   color: var(--text-2);
 }
 
 .nav-item-actions {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
   flex-shrink: 0;
   opacity: 0;
   transition: opacity 0.12s ease;
@@ -450,6 +476,14 @@
 .nav-item:focus-within .nav-item-actions,
 .nav-item-actions[data-always-visible] {
   opacity: 1;
+}
+
+/* The shared .icon-btn is sized for dense editor tables. In the sidebar the
+   rows are taller and there are only ever two of these per row, so they get
+   closer to a comfortable 28px target. */
+.sidebar .icon-btn {
+  width: 26px;
+  height: 26px;
 }
 
 /* Ink and fill have to come from the same family: this was the cyan ink on the
@@ -468,14 +502,14 @@
 }
 
 .empty-hint {
-  padding: 14px 10px;
+  padding: 8px 12px 10px;
   font-size: 12px;
   color: var(--text-3);
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .search-box {
-  margin: 6px 6px 2px;
+  margin: 10px 10px 4px;
   position: relative;
 }
 
@@ -484,8 +518,8 @@
   background: var(--bg-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: 8px 10px 8px 32px;
-  font-size: 12.5px;
+  padding: 9px 12px 9px 34px;
+  font-size: 13px;
   color: var(--text-0);
   outline: none;
   transition: border-color 0.15s ease;
@@ -495,7 +529,7 @@
 }
 .search-box svg {
   position: absolute;
-  left: 10px;
+  left: 12px;
   top: 50%;
   transform: translateY(-50%);
   color: var(--text-3);
@@ -738,7 +772,11 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  min-height: 48px;
+  /* Padding plus a floor rather than a bare min-height: the identity block is
+     two lines whether or not there is a description, so the row keeps the same
+     height from proxy to proxy and the tab strip below it never shifts. */
+  min-height: 60px;
+  padding: 10px 0;
   flex-wrap: wrap;
 }
 
@@ -754,15 +792,17 @@
 
 .proxy-title-row {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: baseline;
+  gap: 9px;
   min-width: 0;
 }
 
 .proxy-title {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 500;
-  letter-spacing: -0.012em;
+  line-height: 1.2;
+  letter-spacing: -0.016em;
+  color: var(--text-0);
   margin: 0;
   /* Truncates rather than wraps — the full name is in the title attribute, and
      the sidebar row it was opened from still shows it. */
@@ -772,15 +812,19 @@
   text-overflow: ellipsis;
 }
 
+/* The base path is the proxy's address — the thing you actually call — not a
+   neutral bit of metadata, so it is tinted like every other identifier in the
+   studio instead of sitting in the same grey as a disabled chip. Baseline
+   alignment with the title, not centre: at 20px against 11.5px, centring left
+   the chip visibly riding high. */
 .proxy-basepath {
   font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--text-1);
-  background: var(--bg-3);
-  border: 1px solid var(--border);
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
-  height: 20px;
+  font-size: 11.5px;
+  color: var(--accent-blue-ink);
+  background: var(--accent-blue-soft);
+  border: 1px solid rgba(26, 115, 232, 0.2);
+  padding: 2px 7px;
+  border-radius: var(--radius-md);
   /* A base path is short and is the thing that identifies the proxy in Apigee,
      so it holds its width and the name gives way first. */
   flex-shrink: 0;
@@ -788,20 +832,24 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  position: relative;
+  top: -1px;
 }
 
 .proxy-desc {
   color: var(--text-2);
   font-size: 12.5px;
-  margin: 2px 0 0;
-  max-width: 640px;
-  /* Two lines, then ellipsis. These descriptions run long, and at the top of
-     every tab they were spending the vertical budget that belongs to the
-     editor below. */
+  margin: 3px 0 0;
+  max-width: 78ch;
+  line-height: 1.45;
+  /* One line, then ellipsis — it was two. These descriptions run long, and a
+     two-line block at the top of every tab both spent the vertical budget that
+     belongs to the editor below and made the header's height depend on which
+     proxy was open. The full text is on the title attribute. */
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
   overflow: hidden;
 }
 
@@ -880,26 +928,47 @@
 
 /* Segments the row into Design and Verify. aria-hidden and not focusable: the
    tablist's semantics are unchanged, this only tells the eye which half of the
-   row it is looking at. The rule on the left is the divider between groups, so
-   the first label doesn't get one. */
+   row it is looking at.
+
+   It used to be bare uppercase text sitting on the tabs' own baseline, which
+   read as a ninth tab that happened to be disabled — the one thing a group
+   label must not look like. It is a chip now: smaller than a tab, filled and
+   bordered so it is plainly a surface rather than a control, and shifted off
+   the tabs' text baseline onto the row's centre line. The rule to its left is
+   the divider between groups, so the first label doesn't get one. */
 .tab-group-label {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 0 9px 0 0;
-  margin-right: 3px;
-  font-size: 9.5px;
-  font-weight: 500;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-3);
+  gap: 12px;
+  padding: 0 10px 0 0;
+  margin-right: 4px;
+  /* The tabs carry a 2px bottom border for the active marker; without this the
+     chip would centre against that extra 2px and sit a hair high. */
+  align-self: center;
+  margin-bottom: 2px;
   user-select: none;
 }
+
+.tab-group-label > span {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
 .tab-group-label::before {
   content: '';
   width: 1px;
-  height: 18px;
+  height: 20px;
   background: var(--border-strong);
 }
 .tab-group-label[data-first] {
