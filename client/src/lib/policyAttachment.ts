@@ -1,4 +1,5 @@
 import type { Proxy, Step } from '../types/proxy';
+import type { SharedFlow } from '../types/sharedFlow';
 
 /**
  * Where a policy is attached, and therefore whether it runs at all.
@@ -107,5 +108,28 @@ export function buildPolicyAttachments(proxy: Proxy): Map<string, PolicyAttachme
     const found = sites.get(policy.name) ?? [];
     result.set(policy.name, { sites: found, group: found[0]?.group ?? 'unattached' });
   }
+  return result;
+}
+
+/**
+ * The shared-flow half of the same question.
+ *
+ * A shared flow's step list is flat and ordered — no request/response split and
+ * no conditional flows of its own — so there are no buckets to sort policies
+ * into the way there are for a proxy. What does carry over is the part that
+ * matters: a policy whose name appears in no step is written into the
+ * sharedflowbundle and never executes. Returns the 1-based step positions each
+ * policy occupies, since a policy may legitimately appear in more than one.
+ */
+export function buildSharedFlowAttachments(sharedFlow: SharedFlow): Map<string, number[]> {
+  const positions = new Map<string, number[]>();
+  sharedFlow.steps.forEach((step, i) => {
+    const list = positions.get(step.policyName);
+    if (list) list.push(i + 1);
+    else positions.set(step.policyName, [i + 1]);
+  });
+
+  const result = new Map<string, number[]>();
+  for (const policy of sharedFlow.policies) result.set(policy.name, positions.get(policy.name) ?? []);
   return result;
 }

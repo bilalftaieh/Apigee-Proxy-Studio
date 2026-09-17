@@ -7,7 +7,9 @@ import { AddPolicyModal } from '../AddPolicyModal';
 import { ConfirmModal } from '../ConfirmModal';
 import { FlowCalloutHelper } from '../FlowCalloutHelper';
 import { setupApigeeMonaco } from '../../lib/monacoApigee';
+import { EDITOR_OPTIONS, attachLayoutFallback } from '../../lib/monacoLayout';
 import { policyReferencesResource, resourceUri } from '../../lib/resourceTypes';
+import { buildSharedFlowAttachments } from '../../lib/policyAttachment';
 
 
 export function SharedFlowPoliciesPanel() {
@@ -26,6 +28,29 @@ export function SharedFlowPoliciesPanel() {
   const [showAdd, setShowAdd] = useState(false);
   const [toDelete, setToDelete] = useState<{ id: string; name: string } | null>(null);
   const selected = sharedFlow.policies.find((p) => p.id === selectedPolicyId) || sharedFlow.policies[0];
+
+  /**
+   * Which step each policy sits at, and which sit at none. A shared flow's step
+   * list is flat, so there are no buckets to group by the way the proxy panel
+   * has — but "in the bundle, in no step, never runs" applies here exactly as
+   * it does there, and was just as invisible.
+   */
+  const stepPositions = useMemo(() => buildSharedFlowAttachments(sharedFlow), [sharedFlow]);
+
+  // Sorted by first step, not by when the policy was created: the group is
+  // labelled "Step list", so listing it in any other order makes the label a
+  // lie and the step numbers look scrambled.
+  const attached = useMemo(
+    () =>
+      sharedFlow.policies
+        .filter((p) => (stepPositions.get(p.name)?.length ?? 0) > 0)
+        .sort((a, b) => (stepPositions.get(a.name)![0] ?? 0) - (stepPositions.get(b.name)![0] ?? 0)),
+    [sharedFlow.policies, stepPositions]
+  );
+  const unattached = useMemo(
+    () => sharedFlow.policies.filter((p) => (stepPositions.get(p.name)?.length ?? 0) === 0),
+    [sharedFlow.policies, stepPositions]
+  );
 
   // Files this policy references — edited on the Resources tab, jumped to from
   // here. See the same comment in PoliciesTab.
@@ -54,48 +79,100 @@ export function SharedFlowPoliciesPanel() {
 
     return (
     <div className="policies-layout">
-      <div>
-        <button className="btn btn-primary btn-sm" style={{ width: '100%', marginBottom: 12 }} onClick={() => setShowAdd(true)}>
+      {/* .policy-list-col, not a bare div: the column has to be a flex column
+          with min-height 0 for .policy-list's own `flex:1; overflow-y:auto` to
+          resolve against it. Without it the list never scrolled — it grew and
+          pushed the column past the panel. */}
+      <div className="policy-list-col">
+        <button className="btn btn-primary btn-sm" style={{ width: '100%', marginBottom: 12, flexShrink: 0 }} onClick={() => setShowAdd(true)}>
           <Icon name="plus" size={13} /> Add Policy
         </button>
+        {/* A count, not a control — those policies are in the list below, in
+            their own group. Matches the proxy editor's Policies tab. */}
+        {unattached.length > 0 && (
+          <div className="policy-unattached-hint">
+            <Icon name="alert-triangle" size={12} />
+            <span>
+              {unattached.length} polic{unattached.length === 1 ? 'y' : 'ies'} in no step — shipped, never run. Add
+              {unattached.length === 1 ? ' it' : ' them'} on the Steps tab.
+            </span>
+          </div>
+        )}
+
         <div className="policy-list">
-          {sharedFlow.policies.map((p) => {
-            const type = policyTypes.find((t) => t.key === p.type);
-            return (
-              <div
-                key={p.id}
-                className={`policy-list-item ${selected?.id === p.id ? 'active' : ''}`}
-                onClick={() => setSelectedPolicyId(p.id)}
-              >
-                <span className="policy-dot" style={{ background: type?.accent || '#8b93a7' }} />
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div className="policy-list-item-name mono">{p.name}</div>
-                  <div className="policy-list-item-type">{type?.label || p.type}</div>
+          {[
+            { group: 'sharedflow-steps' as const, label: 'Step list', policies: attached },
+            { group: 'unattached' as const, label: 'Not attached', policies: unattached },
+          ]
+            .filter((bucket) => bucket.policies.length > 0)
+            .map((bucket) => (
+              <div key={bucket.group} className="policy-group" data-group={bucket.group}>
+                <div className="policy-group-head">
+                  <span className="policy-group-title">{bucket.label}</span>
+                  <span className="policy-group-count">{bucket.policies.length}</span>
                 </div>
-                <button
-                  className="icon-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    duplicatePolicy(p.id);
-                  }}
-                  aria-label="Duplicate policy"
-                  title="Duplicate"
-                >
-                  <Icon name="copy" size={13} />
-                </button>
-                <button
-                  className="icon-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setToDelete({ id: p.id, name: p.name });
-                  }}
-                  aria-label="Delete policy"
-                >
-                  <Icon name="trash-2" size={13} />
-                </button>
+                {bucket.policies.map((p) => {
+                  const type = policyTypes.find((t) => t.key === p.type);
+                  const positions = stepPositions.get(p.name) ?? [];
+                  return (
+                    <div
+                      key={p.id}
+                      className={`policy-list-item ${selected?.id === p.id ? 'active' : ''}`}
+                      onClick={() => setSelectedPolicyId(p.id)}
+                    >
+                      <span
+                        className="policy-dot"
+                        style={{ background: type?.accent || '#8b93a7' }}
+                        title={type?.category ? `${type.category} policy` : undefined}
+                      />
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div className="policy-list-item-name mono">{p.name}</div>
+                        <div className="policy-list-item-type">
+                          {type?.label || p.type}
+                          {positions.length > 0 && (
+                            <>
+                              {' · '}
+                              <span
+                                className="policy-list-item-site"
+                                title={
+                                  positions.length > 1
+                                    ? `Runs at steps ${positions.join(', ')}`
+                                    : `Runs at step ${positions[0]}`
+                                }
+                              >
+                                Step {positions.join(', ')}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        className="icon-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          duplicatePolicy(p.id);
+                        }}
+                        aria-label={`Duplicate policy ${p.name}`}
+                        title="Duplicate"
+                      >
+                        <Icon name="copy" size={13} />
+                      </button>
+                      <button
+                        className="icon-btn icon-btn-danger"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setToDelete({ id: p.id, name: p.name });
+                        }}
+                        aria-label={`Delete policy ${p.name}`}
+                        title="Delete"
+                      >
+                        <Icon name="trash-2" size={13} />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
+            ))}
         </div>
       </div>
 
@@ -138,17 +215,10 @@ export function SharedFlowPoliciesPanel() {
                 defaultLanguage="xml"
                 theme="apigee-dark"
                 beforeMount={setupApigeeMonaco}
+                onMount={(editorInstance) => attachLayoutFallback(editorInstance)}
                 value={selected.xml}
                 onChange={(value) => updatePolicyXml(selected.id, value || '')}
-                options={{
-                  fontSize: 13,
-                  fontFamily: 'JetBrains Mono, monospace',
-                  minimap: { enabled: false },
-                  scrollBeyondLastLine: false,
-                  automaticLayout: true,
-                  padding: { top: 14 },
-                  renderLineHighlight: 'none',
-                }}
+                options={EDITOR_OPTIONS}
               />
           </div>
         </div>
