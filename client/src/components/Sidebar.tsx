@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { api } from '../api/client';
 import { useStore } from '../store/useStore';
 import { useSharedFlowStore } from '../store/useSharedFlowStore';
 import { useWorkspaceStore } from '../store/useWorkspaceStore';
@@ -56,7 +57,6 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
   );
 
   const removeTemplate = async (id: string) => {
-    const { api } = await import('../api/client');
     await api.deleteTemplate(id);
     await deleteTemplateAction();
   };
