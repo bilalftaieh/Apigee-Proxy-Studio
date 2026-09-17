@@ -7,8 +7,10 @@ import { parsePostmanToProxy } from '../lib/postmanImporter.js';
 import { parseWsdlToProxy } from '../lib/wsdlImporter.js';
 import { proxiesStore } from '../lib/storage.js';
 import { uniqueName } from '../lib/uniqueName.js';
+import { createLogger } from '../lib/log/logger.js';
 
 const router = Router();
+const log = createLogger('import');
 
 // Shared tail for every "external artifact -> proxy" import route: dedupe
 // the generated name against what's already saved, persist, and respond.
@@ -16,6 +18,20 @@ async function saveImportedProxy(res, proxy, warnings) {
   const all = await proxiesStore.list();
   proxy.name = uniqueName(proxy.name, all.map((p) => p.name));
   await proxiesStore.save(proxy.id, proxy);
+  // One line covers all five import routes. The shape of what an importer
+  // produced — and how much it had to warn about — is what you compare against
+  // the artifact when someone says "the import lost my flows". The warnings
+  // themselves are included: they are this app's own text, they are already
+  // shown to the user as toasts, and they vanish the moment those toasts fade.
+  log.info('proxy imported', {
+    name: proxy.name,
+    policies: proxy.policies?.length || 0,
+    flows: proxy.flows?.length || 0,
+    targets: proxy.targets?.length || 0,
+    resources: proxy.resources?.length || 0,
+    warnings: warnings?.length || 0,
+    warningText: warnings?.length ? warnings : undefined,
+  });
   res.status(201).json({ proxy, warnings });
 }
 

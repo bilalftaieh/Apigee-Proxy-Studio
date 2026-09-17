@@ -7,6 +7,9 @@ import { generateBundleFiles } from './bundleGenerator.js';
 import { generateSharedFlowBundleFiles } from './sharedFlowBundleGenerator.js';
 import { POLICY_TYPES } from './policyTemplates.js';
 import { collectDeployBlockers, collectSharedFlowDeployBlockers } from './deployChecks.js';
+import { createLogger } from './log/logger.js';
+
+const log = createLogger('lint');
 
 // apigeelint raises PO029 ("The policy type (X) is not recognized") for any
 // policy it has no rule definition for. Its coverage lags Apigee: as of
@@ -40,6 +43,10 @@ async function resolveApigeelintBin() {
     const { binPath } = JSON.parse(await fs.readFile(BIN_CACHE_FILE, 'utf-8'));
     if (binPath === BIN_NAME || (await fs.access(binPath).then(() => true, () => false))) {
       cachedBinPath = binPath;
+      // Logged on the cache-hit path too. This branch is the one that runs
+      // almost every time — a line that only appeared on a cold resolve would
+      // be missing from exactly the sessions you are reading the file for.
+      log.info('resolved apigeelint binary', { bin: binPath, cached: true, fromPath: binPath === BIN_NAME });
       return binPath;
     }
   } catch {
@@ -61,6 +68,10 @@ async function resolveApigeelintBin() {
     }
   }
   await fs.writeFile(BIN_CACHE_FILE, JSON.stringify({ binPath: cachedBinPath }), 'utf-8').catch(() => {});
+  // Which binary got picked explains a whole class of "lint behaves differently
+  // on my machine" — a globally installed apigeelint of another version found
+  // on PATH looks exactly like the local one until you see this line.
+  log.info('resolved apigeelint binary', { bin: cachedBinPath, cached: false, fromPath: cachedBinPath === BIN_NAME });
   return cachedBinPath;
 }
 
@@ -72,12 +83,24 @@ async function runApigeelint(sourceDir, excludes = []) {
   // (rather than execFile's `shell: true`, which concatenates args unescaped).
   const [command, commandArgs] = process.platform === 'win32' ? ['cmd.exe', ['/d', '/s', '/c', bin, ...lintArgs]] : [bin, lintArgs];
 
+  const done = log.start('apigeelint', { excludes: excludes.length || undefined });
   return new Promise((resolve) => {
     execFile(
       command,
       commandArgs,
       { maxBuffer: 1024 * 1024 * 10, timeout: LINT_TIMEOUT_MS, windowsHide: true },
       (err, stdout, stderr) => {
+        // A non-zero exit is NORMAL here — apigeelint exits non-zero whenever it
+        // found anything — so this is not logged as a failure. What is worth
+        // recording is how long the subprocess took (it dominates the request)
+        // and whether it wrote anything to stderr, which is where a spawn
+        // problem or a timeout kill actually announces itself.
+        done('debug', {
+          exit: err?.code ?? 0,
+          killed: err?.killed || undefined,
+          stdoutBytes: stdout?.length || 0,
+          stderr: stderr ? String(stderr).slice(0, 500) : undefined,
+        });
         resolve({ err, stdout: stdout || '', stderr: stderr || '' });
       }
     );
@@ -117,6 +140,7 @@ export async function lintBundleFiles(files, bundleFolderName, excludes = []) {
     const { err, stdout, stderr } = await runApigeelint(bundleDir, excludes);
 
     if (err && err.code === 'ENOENT') {
+      log.error('apigeelint binary not found', { err });
       return {
         ok: false,
         systemError: 'apigeelint is not installed. Run `npm install` in the server/ folder.',
@@ -130,6 +154,14 @@ export async function lintBundleFiles(files, bundleFolderName, excludes = []) {
     try {
       raw = JSON.parse(stdout);
     } catch {
+      // The interesting case: the tool ran but produced something we cannot
+      // read — a crash, a timeout kill, a version whose --format changed. The
+      // UI shows a one-line systemError; the full stderr goes here.
+      log.error('apigeelint produced unparseable output', {
+        exit: err?.code ?? null,
+        killed: err?.killed || false,
+        stderr: String(stderr || stdout || '').slice(0, 2000),
+      });
       return {
         ok: false,
         systemError: (stderr || stdout || `apigeelint produced no output (exit code ${err?.code ?? 'unknown'})`).slice(0, 4000),
@@ -173,6 +205,12 @@ export async function lintBundleFiles(files, bundleFolderName, excludes = []) {
     const errorCount = fileResults.reduce((sum, f) => sum + f.errorCount, 0);
     const warningCount = fileResults.reduce((sum, f) => sum + f.warningCount, 0);
 
+    log.info('lint complete', {
+      bundle: bundleFolderName,
+      bundleFiles: Object.keys(files).length,
+      errorCount,
+      warningCount,
+    });
     return { ok: true, files: fileResults, errorCount, warningCount };
   } finally {
     await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});

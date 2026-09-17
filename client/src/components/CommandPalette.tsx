@@ -76,6 +76,19 @@ export function CommandPalette() {
       proxyStore().openProxy(id);
     };
 
+    // Always available, with or without a document open: the times you want the
+    // log are exactly the times nothing opened.
+    list.push({
+      id: 'act-logs',
+      group: 'Actions',
+      label: 'Open logs',
+      hint: 'Everything the app and the server recorded',
+      icon: 'scroll-text',
+      keywords: 'debug console errors diagnostics troubleshoot',
+      shortcut: 'Ctrl+`',
+      run: () => useUiStore.getState().openLogConsole(),
+    });
+
     if (currentSharedFlow) {
       list.push({
         id: 'act-save-sf',

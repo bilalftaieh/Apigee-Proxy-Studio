@@ -78,13 +78,38 @@ The raw-XML editor is schema-aware. Completion and hover come from
   root tag for its description, whether it is an Extensible (billing-tier) policy,
   and a link to the Apigee reference page.
 
-Coverage is 28 of Apigee's ~60 policy root tags — the 12 the visual editor already
-describes, whose trees are *derived* from `POLICY_SCHEMAS` so the two cannot drift,
-plus hand-authored trees for the types this workspace actually uses. Uncovered
-types fall back to the elements every policy accepts. **There are deliberately no
-"unknown element" squiggles**: with a partial catalogue they would underline valid
-XML in the uncovered half, and a false warning in a bundle you are about to ship
-costs more than a missing one.
+Coverage is **all 60 policy root tags**, from three layers merged most- to
+least-hand-checked:
+
+1. the 12 the visual editor already describes, *derived* from `POLICY_SCHEMAS` so
+   the two cannot drift;
+2. hand-authored trees for the types this workspace leans on, whose prose says
+   what actually goes wrong rather than what the element is;
+3. the rest generated from the live Apigee X reference documentation by
+   `npm run generate:policy-schemas` — including the Apigee X-era policies
+   (LLMTokenQuota, SemanticCache*, HTTPModifier, DataCapture, the integration
+   policies) that no published schema covers.
+
+The generated layer only ever *fills gaps*: regenerating it can add elements and
+descriptions but never overwrites a hand-written one. Re-run the generator when
+Apigee ships new policies; it reports what it could not parse instead of guessing.
+
+**There are deliberately no "unknown element" squiggles.** The catalogue is built
+largely from documentation samples, which show what is valid rather than
+exhaustively what is allowed, so an element the docs never demonstrate is absent
+without being wrong to write — and a false warning in a bundle you are about to
+ship costs more than a missing one.
+
+### If completions show icons but no names
+
+That means Monaco's measured size has gone stale — it sizes the completion
+list's text column from `editor.getLayoutInfo()`, so a collapsed reading clips
+every label to nothing while the fixed-size icons still draw. The editors do not
+rely on Monaco's `automaticLayout` alone for this reason; see
+[`monacoLayout.ts`](client/src/lib/monacoLayout.ts), which measures the container
+and tells Monaco the answer. To confirm a suspected recurrence, check that
+`monaco.editor.getEditors()[0].getLayoutInfo()` matches the editor's on-screen
+size.
 
 ## Undo / redo
 
@@ -152,3 +177,71 @@ generated bundle to a temp directory, runs `apigeelint -s <dir>/apiproxy -f
 json.js --profile apigeex`, parses the JSON result, and deletes the temp
 directory. The first run of a session can take several seconds while it spins
 up its rule engine — that's normal, not a hang.
+
+## Logging
+
+Everything the app does — in the browser and on the server — is recorded, and
+the two halves land in the same place.
+
+**In the app:** `Ctrl+\`` (or "Open logs" in the command palette) opens a dock at
+the bottom of the window showing both sides merged in time order. Filter by
+level or text, click a line to expand its fields, and copy what's shown or
+download the whole file. It stays open while you work, so the way to debug
+something is usually to open it and do the thing again.
+
+**On disk:** `server/logs/studio.log`, one JSON object per line, rotated at 5 MB
+and keeping five files. `npm run logs` tails it.
+
+```bash
+npm run logs
+```
+
+Because it's NDJSON, questions get answered with ordinary tools:
+
+```bash
+grep '"l":"error"' server/logs/studio.log | tail -20
+```
+
+### Request ids
+
+Every request gets a short id. It goes on the response as `x-request-id`, is
+recorded by the browser against its own call, is stamped on every server line
+produced while handling it, and is returned in the body of a 500. So a failure
+someone reports resolves to one search:
+
+```bash
+grep '"reqId":"3b080005"' server/logs/studio.log
+```
+
+…which returns the browser's attempt, the request, the work it triggered
+(storage writes, the apigeelint subprocess, the AI call) and the stack that
+ended it, in order.
+
+### Levels
+
+Two of them, on purpose: the terminal shows `LOG_LEVEL` (default `info`) so it
+stays readable, while the file and the in-app panel keep `LOG_FILE_LEVEL`
+(default `debug`) so the detail you need when something breaks was already being
+recorded before it broke. File writes are batched and off the request path, so
+the verbose sink is also the cheap one.
+
+Both can be changed without a restart, from the controls at the bottom of the
+log panel. See `server/.env.example` for every setting.
+
+### What is never written
+
+Field names that mean "secret" (`apiKey`, `authorization`, `token`, `password`,
+…) are replaced with `[redacted]` at any depth, as is the configured
+`GEMINI_API_KEY` wherever it appears in a string. Records are bounded — depth,
+array length, string length — so no log call can write a megabyte or follow a
+cycle.
+
+The AI code logs sizes, timings, models and HTTP statuses, and never prompt
+content: the log is the artifact people paste into bug reports, and writing
+prompts to it would reintroduce on disk exactly what
+`server/src/lib/ai/guard.js` exists to prevent. A blocked payload is logged at
+`fatal` — without the payload.
+
+```bash
+npm run test:logging
+```

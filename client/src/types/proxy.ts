@@ -270,6 +270,8 @@ export interface Proxy {
   lintExcludes: string[];
   environments: ProxyEnvironment[];
   tests: TestCase[];
+  /** Opt this workspace out of the AI features entirely. Enforced server-side too. */
+  aiDisabled?: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -505,4 +507,90 @@ export interface Template {
   proxy: Omit<Proxy, 'id' | 'createdAt' | 'updatedAt'>;
   createdAt?: number;
   updatedAt?: number;
+}
+
+export interface AiStatus {
+  configured: boolean;
+  provider: string;
+  model: string;
+}
+
+/** What a generation would send — shown to the user before anything leaves the machine. */
+export interface AiPreview {
+  systemInstruction: string;
+  prompt: string;
+  /** Values that were withheld: the placeholder that replaced each, and its length. Never the value. */
+  substitutions: { placeholder: string; characters: number }[];
+}
+
+export interface AiPolicyResult {
+  /** False when the model's output still failed validation after a retry — `warnings` says why. */
+  ok: boolean;
+  xml: string;
+  policyType: string;
+  name: string;
+  notes: string;
+  attempts: number;
+  warnings: string[];
+}
+
+/**
+ * What the server could establish about a proposed fix by re-deriving the
+ * deploy blockers with it in place — not what the model claimed.
+ */
+export interface AiFixVerification {
+  /** Whether the finding is one we can cheaply re-run. Apigeelint rules are not. */
+  recheckable: boolean;
+  /** Null when `recheckable` is false: unknown, reported as such rather than as success. */
+  resolved: boolean | null;
+  /** Deploy blockers present after the edit that were not present before it. */
+  newProblems: string[];
+}
+
+export type AiReviewSeverity = 'high' | 'medium' | 'low';
+
+/**
+ * Whether the finding can be acted on by rewriting the named policy's XML
+ * ('policy'), needs a step moved/added/removed ('flow'), or needs something
+ * outside this proxy ('none'). Only 'policy' gets a Fix with AI button.
+ */
+export type AiReviewFixKind = 'policy' | 'flow' | 'none';
+
+export interface AiReviewFinding {
+  title: string;
+  severity: AiReviewSeverity;
+  category: string;
+  detail: string;
+  recommendation: string;
+  where: string;
+  fixKind: AiReviewFixKind;
+  /** Resolved server-side: every one of these is a policy this proxy really has. */
+  policies: { id: string; name: string; type: string; label: string }[];
+}
+
+export interface AiReviewResult {
+  summary: string;
+  findings: AiReviewFinding[];
+  attempts: number;
+  /** Findings thrown out for naming something this proxy doesn't have. Shown, not hidden. */
+  dropped: number;
+  /** Policies whose XML was left out to keep the request a reasonable size. */
+  policiesWithoutXml: string[];
+}
+
+export interface AiFixResult {
+  /** False when the fix failed validation, left the finding in place, or broke something else. */
+  ok: boolean;
+  policyId: string;
+  policyName: string;
+  policyType: string;
+  /** The policy as it stands now, for the diff. */
+  original: string;
+  xml: string;
+  notes: string;
+  attempts: number;
+  /** True when the model deliberately left the policy alone — there is nothing to apply. */
+  unchanged: boolean;
+  warnings: string[];
+  verification: AiFixVerification | null;
 }

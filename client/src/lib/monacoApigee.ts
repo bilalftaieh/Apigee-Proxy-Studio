@@ -9,11 +9,13 @@
  * tab, say) resolves to no element tree and the providers stay quiet, which is
  * the behaviour we want anyway.
  *
- * There are deliberately no diagnostics here. Our element catalogue covers about
- * half of Apigee's ~60 policy tags, so "unknown element" squiggles would fire on
- * perfectly valid XML in the uncovered half. Wrong red underlines in a file you
- * are about to ship cost more than absent ones. `fastLint.ts` keeps the checks
- * that can be made without a complete schema.
+ * There are deliberately no diagnostics here, even though the catalogue now
+ * covers every policy root tag. It is built largely from documentation samples,
+ * which show what is *valid* rather than exhaustively what is *allowed* — an
+ * element the docs never demonstrate is missing from the tree without being
+ * wrong to write. Turning that into "unknown element" squiggles would underline
+ * correct XML in a file about to be shipped, which costs more than absent
+ * warnings. `fastLint.ts` keeps the checks that hold without a complete schema.
  */
 
 import type { BeforeMount, Monaco } from '@monaco-editor/react';

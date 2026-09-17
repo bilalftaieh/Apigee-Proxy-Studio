@@ -3,6 +3,7 @@ import Editor from '@monaco-editor/react';
 import { Icon } from './Icon';
 import { ConfirmModal } from './ConfirmModal';
 import { setupApigeeMonaco } from '../lib/monacoApigee';
+import { EDITOR_OPTIONS, attachLayoutFallback } from '../lib/monacoLayout';
 import { resourceLanguage } from '../lib/resourceLanguage';
 import {
   RESOURCE_TYPES,
@@ -269,17 +270,10 @@ export function ResourcesPanel({
               defaultLanguage={resourceLanguage(selected.path)}
               theme="apigee-dark"
               beforeMount={setupApigeeMonaco}
+              onMount={(editorInstance) => attachLayoutFallback(editorInstance)}
               value={selected.content}
               onChange={(value) => onUpdate(selected.id, value || '')}
-              options={{
-                fontSize: 13,
-                fontFamily: 'JetBrains Mono, monospace',
-                minimap: { enabled: false },
-                scrollBeyondLastLine: false,
-                automaticLayout: true,
-                padding: { top: 14 },
-                renderLineHighlight: 'none',
-              }}
+              options={EDITOR_OPTIONS}
             />
           </div>
         </div>

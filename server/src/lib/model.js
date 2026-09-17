@@ -169,6 +169,10 @@ export function normalizeProxy(proxy) {
     lintExcludes: Array.isArray(proxy.lintExcludes) ? proxy.lintExcludes : [],
     environments: Array.isArray(proxy.environments) ? proxy.environments : [],
     tests: Array.isArray(proxy.tests) ? proxy.tests : [],
+    // Opt out of the AI features for this workspace. routes/ai.js reads this
+    // off the SAVED proxy rather than from the request body, so a stale browser
+    // tab or a hand-rolled call cannot clear the flag by simply not sending it.
+    aiDisabled: proxy.aiDisabled === true,
   };
 }
 
@@ -313,6 +317,7 @@ export function createBlankProxy({ name, basePath, description } = {}) {
     lintExcludes: [],
     environments: [],
     tests: [],
+    aiDisabled: false,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };

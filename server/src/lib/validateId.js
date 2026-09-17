@@ -4,8 +4,14 @@
 // letters — is a path-traversal attempt rather than a real id.
 const SAFE_ID = /^[A-Za-z0-9_-]+$/;
 
+// Same test, for an id that arrives somewhere other than a route param — a
+// request body, say — where the router's param handler never runs.
+export function isSafeId(value) {
+  return typeof value === 'string' && SAFE_ID.test(value);
+}
+
 export function requireSafeId(req, res, next, value) {
-  if (!SAFE_ID.test(value)) {
+  if (!isSafeId(value)) {
     return res.status(400).json({ error: 'Invalid id' });
   }
   next();

@@ -3,6 +3,8 @@ dist/
 .claude/
 .DS_Store
 *.log
+# Rotated log files (studio.log.1, .2 …) don't match *.log
+server/logs/
 .env
 .env.local
 !.env.example
@@ -14,3 +16,6 @@ server/data/templates/*
 !server/data/proxies/.gitkeep
 !server/data/templates/.gitkeep
 server/test-bundles/*.zip
+
+# Cached Apigee reference pages for scripts/generate-policy-schemas.mjs
+scripts/.docs-cache/

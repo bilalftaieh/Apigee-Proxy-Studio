@@ -15,8 +15,12 @@
     "dev:client": "node node_modules/vite/bin/vite.js client",
     "install:all": "npm install",
     "lint:templates": "node scripts/lint-policy-templates.mjs",
+    "generate:policy-schemas": "node scripts/generate-policy-schemas.mjs",
     "test:roundtrip": "node scripts/roundtrip.mjs",
-    "build": "npm run build -w client"
+    "build": "npm run build -w client",
+    "test:ai": "node --test \"server/src/lib/ai/*.test.js\" \"server/src/routes/ai.test.js\"",
+    "test:logging": "node --test \"server/src/lib/log/*.test.js\"",
+    "logs": "powershell -NoProfile -Command \"Get-Content -Path server/logs/studio.log -Wait -Tail 40\""
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

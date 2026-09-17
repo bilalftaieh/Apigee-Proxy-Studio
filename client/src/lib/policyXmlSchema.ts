@@ -2,7 +2,7 @@
  * What elements and attributes each policy type accepts, for completion and
  * hover in the raw-XML editor.
  *
- * Two sources, in this order:
+ * Three sources, merged in this order of precedence:
  *
  *   1. **Derived** from `POLICY_SCHEMAS` (policySchema.ts). Those schemas
  *      already describe, for 12 policy types, every field the visual editor can
@@ -11,17 +11,23 @@
  *      catalogue wearing a different hat, so it is converted rather than
  *      retyped: adding a field to a visual editor extends XML completion in the
  *      same commit, and the two can't drift.
- *   2. **Authored** below, for types the visual editor doesn't cover. Ordered by
- *      what the proxies in this workspace actually use, not by the docs' order.
+ *   2. **Authored** below, for the policy types this workspace leans on hardest.
+ *      Hand-written prose that says what actually goes wrong — which the
+ *      reference documentation, by its nature, does not.
+ *   3. **Generated** from the Apigee X reference documentation by
+ *      `scripts/generate-policy-schemas.mjs`. Covers essentially every policy
+ *      type, including the Apigee X-era ones (the AI/LLM policies,
+ *      HTTPModifier, DataCapture, the integration policies) that no published
+ *      schema describes.
  *
- * Coverage is deliberately partial. Apigee X has ~60 policy root tags and
- * guessing at the long tail would put wrong elements in the list, which is
- * worse than an empty one — for an unknown tag the providers fall back to the
- * universal elements plus whatever the open document already contains, and
- * suggest nothing they can't stand behind.
+ * Precedence runs from most to least hand-checked: the generated layer supplies
+ * structure and prose only where the first two are silent, so regenerating it
+ * can add elements and documentation but can never overwrite something a human
+ * wrote deliberately.
  */
 
 import { POLICY_SCHEMAS, type PolicyField, type PolicySchema } from './policySchema';
+import { GENERATED_DOC_SLUGS, GENERATED_POLICY_ELEMENTS } from './generated/apigeePolicyElements';
 
 export interface XmlAttrDef {
   name: string;
@@ -496,50 +502,19 @@ const AUGMENTS: Record<string, XmlElementDef[]> = {
  * cloud.google.com — re-run that check rather than trusting the pattern if you
  * add one.
  */
+// What the generator could not reach. Everything else that used to live here —
+// 38 of 39 entries — is now in GENERATED_DOC_SLUGS, which is built from the
+// reference index itself and takes precedence in policyDocUrl below, so the
+// hand-written copies were dead weight that could only ever go stale.
 const DOC_SLUGS: Record<string, string> = {
-  AccessControl: 'access-control-policy',
-  AccessEntity: 'access-entity-policy',
-  AssignMessage: 'assign-message-policy',
-  BasicAuthentication: 'basic-authentication-policy',
-  CORS: 'cors-policy',
-  DecodeJWS: 'decode-jws-policy',
-  DecodeJWT: 'decode-jwt-policy',
-  ExtractVariables: 'extract-variables-policy',
-  FlowCallout: 'flow-callout-policy',
-  GenerateJWS: 'generate-jws-policy',
-  GenerateJWT: 'generate-jwt-policy',
-  GraphQL: 'graphql-policy',
-  HMAC: 'hmac-policy',
-  InvalidateCache: 'invalidate-cache-policy',
-  Javascript: 'javascript-policy',
-  JavaCallout: 'java-callout-policy',
-  JSONThreatProtection: 'json-threat-protection-policy',
-  JSONToXML: 'json-xml-policy',
-  KeyValueMapOperations: 'key-value-map-operations-policy',
-  LookupCache: 'lookup-cache-policy',
-  MessageLogging: 'message-logging-policy',
-  MessageValidation: 'message-validation-policy',
-  OASValidation: 'oas-validation-policy',
-  OAuthV2: 'oauthv2-policy',
-  PopulateCache: 'populate-cache-policy',
   PythonScript: 'python-script-policy',
-  Quota: 'quota-policy',
-  RaiseFault: 'raise-fault-policy',
-  RegularExpressionProtection: 'regular-expression-protection',
-  ResetQuota: 'reset-quota-policy',
-  ResponseCache: 'response-cache-policy',
-  ServiceCallout: 'service-callout-policy',
-  SpikeArrest: 'spike-arrest-policy',
-  VerifyAPIKey: 'verify-api-key-policy',
-  VerifyJWS: 'verify-jws-policy',
-  VerifyJWT: 'verify-jwt-policy',
-  XMLThreatProtection: 'xml-threat-protection-policy',
-  XMLToJSON: 'xml-json-policy',
-  XSL: 'xsl-transform-policy',
 };
 
 export function policyDocUrl(rootTag: string): string | undefined {
-  const slug = DOC_SLUGS[rootTag];
+  // The generated slugs come from the reference index itself, so they are right
+  // by construction; the hand-maintained map below only covers what the
+  // generator could not reach.
+  const slug = GENERATED_DOC_SLUGS[rootTag] ?? DOC_SLUGS[rootTag];
   return slug ? `https://cloud.google.com/apigee/docs/api-platform/reference/policies/${slug}` : undefined;
 }
 
@@ -660,7 +635,36 @@ function deriveFromSchema(schema: PolicySchema): XmlElementDef {
   return root;
 }
 
-/** Built once: the schemas and the authored catalogue are both module constants. */
+/**
+ * Adds anything `from` has that `into` lacks, recursively. Never replaces: a
+ * hand-written doc string, a curated enum or a deliberate element order all
+ * survive a regeneration of the documentation layer untouched.
+ */
+function fillFrom(into: XmlElementDef, from: XmlElementDef) {
+  if (!into.doc && from.doc) into.doc = from.doc;
+  if (!into.values && from.values) into.values = from.values;
+  if (!into.repeatable && from.repeatable) into.repeatable = from.repeatable;
+
+  if (from.attrs?.length) {
+    into.attrs ||= [];
+    for (const attr of from.attrs) {
+      const mine = into.attrs.find((a) => a.name === attr.name);
+      if (!mine) into.attrs.push(attr);
+      else if (!mine.values && attr.values) mine.values = attr.values;
+    }
+  }
+
+  if (from.children?.length) {
+    into.children ||= [];
+    for (const child of from.children) {
+      const mine = into.children.find((c) => c.name === child.name);
+      if (!mine) into.children.push(child);
+      else fillFrom(mine, child);
+    }
+  }
+}
+
+/** Built once: every source here is a module constant. */
 const CATALOG: Record<string, XmlElementDef> = (() => {
   const byRootTag: Record<string, XmlElementDef> = {};
   for (const schema of Object.values(POLICY_SCHEMAS)) {
@@ -679,6 +683,16 @@ const CATALOG: Record<string, XmlElementDef> = (() => {
     for (const extra of extras) {
       if (!tree.children.some((c) => c.name === extra.name)) tree.children.push(extra);
     }
+  }
+
+  // The generated layer is folded in last and only ever adds: a tag we have no
+  // tree for is taken wholesale, and for one we do have, `fillFrom` contributes
+  // the elements, attributes, enums and prose that are missing without touching
+  // anything already there.
+  for (const [rootTag, generated] of Object.entries(GENERATED_POLICY_ELEMENTS)) {
+    const existing = catalog[rootTag];
+    if (!existing) catalog[rootTag] = generated;
+    else fillFrom(existing, generated);
   }
 
   // Every policy root can carry these, so they are appended once here rather
