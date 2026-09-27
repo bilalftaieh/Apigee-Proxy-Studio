@@ -28,7 +28,7 @@ export function StepList({ location, steps }: { location: StepLocation; steps: S
     <div>
       <div className="step-list">
         {steps.length === 0 && (
-          <div style={{ fontSize: 11.5, color: 'var(--text-3)', padding: '4px 2px' }}>No steps attached.</div>
+          <div className="step-list-empty">No steps attached.</div>
         )}
         {steps.map((step, i) => (
           <div className="step-item" key={`${step.policyName}-${i}`}>
