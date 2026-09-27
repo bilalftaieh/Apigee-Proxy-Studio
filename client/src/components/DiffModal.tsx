@@ -4,6 +4,7 @@ import { Modal } from './Modal';
 import { Icon } from './Icon';
 import { api } from '../api/client';
 import { setupApigeeMonaco } from '../lib/monacoApigee';
+import { READ_ONLY_EDITOR_OPTIONS } from '../lib/monacoLayout';
 import type { BundleDiffResult, DiffSide } from '../types/proxy';
 
 function languageFor(path: string): string {
@@ -160,15 +161,7 @@ export function DiffModal({
                 beforeMount={setupApigeeMonaco}
                 original={result.leftFiles[selected] ?? ''}
                 modified={result.rightFiles[selected] ?? ''}
-                options={{
-                  readOnly: true,
-                  fontSize: 13,
-                  fontFamily: 'JetBrains Mono, monospace',
-                  minimap: { enabled: false },
-                  scrollBeyondLastLine: false,
-                  automaticLayout: true,
-                  renderSideBySide: true,
-                }}
+                options={{ ...READ_ONLY_EDITOR_OPTIONS, renderSideBySide: true }}
               />
             )}
           </div>

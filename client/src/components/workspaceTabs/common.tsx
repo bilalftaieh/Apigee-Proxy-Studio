@@ -1,6 +1,7 @@
 import { useStore } from '../../store/useStore';
 import { useSharedFlowStore } from '../../store/useSharedFlowStore';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
+import { useNavGuard } from '../../lib/navGuard';
 import { Icon } from '../Icon';
 import type { GovernanceSeverity } from '../../types/workspace';
 
@@ -49,11 +50,12 @@ export function SeverityBadge({ severity, children }: { severity: GovernanceSeve
 export function OpenEntityButton({ id, name, kind = 'proxy' }: { id: string | null; name: string; kind?: 'proxy' | 'sharedFlow' }) {
   const closeWorkspace = useWorkspaceStore((s) => s.closeWorkspace);
   if (!id) return null;
-  const open = () => {
-    closeWorkspace();
-    if (kind === 'sharedFlow') useSharedFlowStore.getState().openSharedFlow(id);
-    else useStore.getState().openProxy(id);
-  };
+  const open = () =>
+    useNavGuard.getState().requestNavigation(() => {
+      closeWorkspace();
+      if (kind === 'sharedFlow') useSharedFlowStore.getState().openSharedFlow(id);
+      else useStore.getState().openProxy(id);
+    });
   return (
     <button className="btn btn-sm btn-ghost" style={{ flexShrink: 0 }} onClick={open} title={`Open ${name}`}>
       <Icon name="arrow-right" size={12} /> Open

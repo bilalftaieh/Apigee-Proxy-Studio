@@ -11,6 +11,8 @@ import { SharedFlowEditor } from './components/SharedFlowEditor';
 import { WorkspaceView } from './components/WorkspaceView';
 import { CommandPalette } from './components/CommandPalette';
 import { LogConsole } from './components/LogConsole';
+import { UnsavedChangesModal } from './components/UnsavedChangesModal';
+import { dirtyDocName } from './lib/navGuard';
 import { useUiStore } from './store/useUiStore';
 import { useWorkspaceStore } from './store/useWorkspaceStore';
 
@@ -82,6 +84,21 @@ export default function App() {
     };
     window.addEventListener('unhandledrejection', onRejection);
     return () => window.removeEventListener('unhandledrejection', onRejection);
+  }, []);
+
+  // The in-app guard can't cover the browser's own exits — reload, close, Back.
+  // Nothing autosaves, so without this a reflexive Ctrl+R throws away the work
+  // the guard was written to protect. The browser shows its own wording here;
+  // all a page can do is ask for the prompt.
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!dirtyDocName()) return;
+      e.preventDefault();
+      // Safari and older Chrome still want the legacy return value set.
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, []);
 
   // Global shortcuts. Ctrl/Cmd+K opens the command palette; Ctrl/Cmd+S saves
@@ -165,6 +182,7 @@ export default function App() {
       <SuggestionBanner />
       <CommandPalette />
       <LogConsole />
+      <UnsavedChangesModal />
     </div>
   );
 }

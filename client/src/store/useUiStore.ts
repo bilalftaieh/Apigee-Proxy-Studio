@@ -35,6 +35,30 @@ interface UiStoreState {
    */
   sidebarCollapsed: boolean;
   toggleSidebar: () => void;
+
+  /**
+   * Which conditional flow cards are open, by flow id.
+   *
+   * It lives here rather than in ConditionalFlowsSection because the tabs are
+   * mounted conditionally: stepping over to Policies to check a name unmounts
+   * the section, and local state would collapse everything again on the way
+   * back. Flow ids are random and never reused, so ids left behind by a proxy
+   * you have since closed simply never match anything and cost nothing.
+   */
+  expandedFlowIds: string[];
+  setFlowExpanded: (id: string, expanded: boolean) => void;
+  setManyFlowsExpanded: (ids: string[], expanded: boolean) => void;
+
+  /**
+   * A flow something elsewhere asked to be shown — today the command palette's
+   * Flows results. Those used to call setActiveTab and nothing else, which on a
+   * thirteen-flow proxy dropped you at the top of the section and left you to
+   * find the flow you had just searched for by hand. The section that owns the
+   * flow expands it, scrolls to it and clears this.
+   */
+  revealedFlowId: string | null;
+  revealFlow: (id: string) => void;
+  clearRevealedFlow: () => void;
 }
 
 export const useUiStore = create<UiStoreState>((set) => ({
@@ -60,4 +84,24 @@ export const useUiStore = create<UiStoreState>((set) => ({
       }
       return { sidebarCollapsed };
     }),
+
+  expandedFlowIds: [],
+  setFlowExpanded: (id, expanded) =>
+    set((s) => ({
+      expandedFlowIds: expanded
+        ? s.expandedFlowIds.includes(id)
+          ? s.expandedFlowIds
+          : [...s.expandedFlowIds, id]
+        : s.expandedFlowIds.filter((x) => x !== id),
+    })),
+  setManyFlowsExpanded: (ids, expanded) =>
+    set((s) => {
+      const touched = new Set(ids);
+      const kept = s.expandedFlowIds.filter((x) => !touched.has(x));
+      return { expandedFlowIds: expanded ? [...kept, ...ids] : kept };
+    }),
+
+  revealedFlowId: null,
+  revealFlow: (id) => set({ revealedFlowId: id }),
+  clearRevealedFlow: () => set({ revealedFlowId: null }),
 }));

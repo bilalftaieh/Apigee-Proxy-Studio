@@ -1,6 +1,17 @@
 import type { IDisposable, editor as MonacoEditorNs } from 'monaco-editor';
 
 /**
+ * The same stack --font-mono resolves to in the stylesheets. Every editor used
+ * to ask for 'JetBrains Mono, monospace', which the app has never loaded: the
+ * only webfonts it fetches are Roboto and Roboto Mono, so every one of these
+ * editors fell through to the browser's default monospace — Courier New on
+ * Windows — while the mono text beside them rendered in Roboto Mono. Naming
+ * the font we actually ship makes the code in the editors match the code
+ * everywhere else.
+ */
+export const MONO_FONT = "'Roboto Mono', ui-monospace, 'Cascadia Code', Consolas, monospace";
+
+/**
  * The options every code editor in this app is mounted with.
  *
  * Shared rather than repeated because it was repeated: three identical literals
@@ -12,7 +23,7 @@ import type { IDisposable, editor as MonacoEditorNs } from 'monaco-editor';
  */
 export const EDITOR_OPTIONS: MonacoEditorNs.IStandaloneEditorConstructionOptions = Object.freeze({
   fontSize: 13,
-  fontFamily: 'JetBrains Mono, monospace',
+  fontFamily: MONO_FONT,
   minimap: { enabled: false },
   scrollBeyondLastLine: false,
   automaticLayout: true,
@@ -27,6 +38,18 @@ export const EDITOR_OPTIONS: MonacoEditorNs.IStandaloneEditorConstructionOptions
   fixedOverflowWidgets: true,
   padding: { top: 14 },
   renderLineHighlight: 'none',
+});
+
+/**
+ * The read-only viewers — XML Preview, the shared-flow preview, the drift diff.
+ * Each of these carried its own copy of the eight options above with
+ * `readOnly: true` bolted on, which is how all three ended up asking for a font
+ * the app does not load: the fix to EDITOR_OPTIONS never reached them because
+ * they were never reading it. Derived, so it cannot drift again.
+ */
+export const READ_ONLY_EDITOR_OPTIONS: MonacoEditorNs.IStandaloneEditorConstructionOptions = Object.freeze({
+  ...EDITOR_OPTIONS,
+  readOnly: true,
 });
 
 /**

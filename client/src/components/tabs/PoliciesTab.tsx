@@ -51,7 +51,15 @@ export function PoliciesTab() {
     };
   }, [proxy.aiDisabled]);
   const [toDelete, setToDelete] = useState<{ id: string; name: string } | null>(null);
-  const [editorView, setEditorView] = useState<'visual' | 'xml'>('xml');
+  /**
+   * Which editor the user last chose, not which one this policy opened in.
+   * Selecting a policy used to reset this to Visual, so anyone working in XML
+   * across a handful of policies had to switch back on every single click —
+   * and the reset ran in an effect, so the first paint mounted Monaco only to
+   * tear it down again a frame later. Visual is still the default; it is just
+   * a default now rather than something re-imposed 27 times.
+   */
+  const [preferredView, setPreferredView] = useState<'visual' | 'xml'>('visual');
   const [filter, setFilter] = useState('');
 
   const editorRef = useRef<MonacoEditorNs.IStandaloneCodeEditor | null>(null);
@@ -59,6 +67,9 @@ export function PoliciesTab() {
 
   const selected = proxy.policies.find((p) => p.id === selectedPolicyId) || proxy.policies[0];
   const schema = selected ? getPolicySchema(selected.type) : undefined;
+  // Policies with no visual schema only have the one view to offer, whatever
+  // the preference says.
+  const editorView = schema ? preferredView : 'xml';
 
   // Where each policy is attached — the thing the list used to leave out. See
   // lib/policyAttachment.ts for why it matters.
@@ -91,9 +102,6 @@ export function PoliciesTab() {
   const matchCount = groupedPolicies.reduce((n, g) => n + g.policies.length, 0);
   const unattachedCount = proxy.policies.filter((p) => attachments.get(p.name)?.group === 'unattached').length;
 
-  useEffect(() => {
-    setEditorView(selected && getPolicySchema(selected.type) ? 'visual' : 'xml');
-  }, [selected?.id]);
 
   // Files this policy references. Editing them happens on the Resources tab —
   // this is a jump link, not a second editor: one file can be referenced by
@@ -186,8 +194,15 @@ export function PoliciesTab() {
           </button>
         )}
         {/* Worth the row once a proxy has more than a handful of policies —
-            the real ones here run to 27, which is a long scroll to eyeball. */}
-        {proxy.policies.length > 6 && (
+            the real ones here run to 27, which is a long scroll to eyeball.
+
+            `|| filter` is not redundant. The row used to be keyed on the count
+            alone, so deleting policies while a filter was active could take the
+            list under the threshold and unmount the input with its text still
+            in state: the tab badge said six policies, the list showed the two
+            that matched, and the control that would have explained why was
+            gone. A filter that is doing something is always visible. */}
+        {(proxy.policies.length > 6 || filter) && (
           <div className="policy-filter">
             <Icon name="search" size={13} />
             <input
@@ -232,36 +247,43 @@ export function PoliciesTab() {
                     key={p.id}
                     className={`policy-list-item ${selected?.id === p.id ? 'active' : ''}`}
                     data-cat={policyCategory(p.type, type?.category)}
-                    onClick={() => setSelectedPolicyId(p.id)}
                   >
-                    {/* Colour carries the policy family and nothing else, so a
-                        glance down the list says what kind of work happens
-                        where. The two letters are the same prefix the studio
-                        generates names from, so the chip and the name agree —
-                        and they, not the colour, are what actually names the
-                        category for anyone who can't separate the hues. */}
-                    <span
-                      className="policy-cat"
-                      data-cat={policyCategory(p.type, type?.category)}
-                      title={type?.category ? `${type.category} policy` : undefined}
+                    {/* The name is truncated on most real proxies — 260px of
+                        column against names like AM-Set-MT940ExtendedStatement
+                        — so the full one has to be readable without selecting
+                        the row and reading it out of the editor header. */}
+                    <button
+                      type="button"
+                      className="policy-list-item-main"
+                      aria-current={selected?.id === p.id || undefined}
+                      title={`${p.name} — ${type?.label || p.type}${sites.length ? ` · ${sites.map((site) => site.where).join(', ')}` : ''}`}
+                      onClick={() => setSelectedPolicyId(p.id)}
                     >
-                      {policyAbbr(p.type)}
-                    </span>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div className="policy-list-item-name mono">{p.name}</div>
-                      <div className="policy-list-item-type">
-                        {type?.label || p.type}
-                        {sites.length > 0 && (
-                          <>
-                            {' · '}
-                            <span className="policy-list-item-site" title={sites.map((site) => site.where).join(', ')}>
-                              {sites[0].where}
-                              {sites.length > 1 && ` +${sites.length - 1}`}
-                            </span>
-                          </>
-                        )}
+                      {/* Colour carries the policy family and nothing else, so a
+                          glance down the list says what kind of work happens
+                          where. The two letters are the same prefix the studio
+                          generates names from, so the chip and the name agree —
+                          and they, not the colour, are what actually names the
+                          category for anyone who can't separate the hues. */}
+                      <span className="policy-cat" data-cat={policyCategory(p.type, type?.category)}>
+                        {policyAbbr(p.type)}
+                      </span>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div className="policy-list-item-name mono">{p.name}</div>
+                        <div className="policy-list-item-type">
+                          {type?.label || p.type}
+                          {sites.length > 0 && (
+                            <>
+                              {' · '}
+                              <span className="policy-list-item-site">
+                                {sites[0].where}
+                                {sites.length > 1 && ` +${sites.length - 1}`}
+                              </span>
+                            </>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    </button>
                     <button
                       className="icon-btn"
                       onClick={(e) => {
@@ -298,11 +320,11 @@ export function PoliciesTab() {
             <input className="mono" value={selected.name} onChange={(e) => renamePolicy(selected.id, e.target.value)} />
             <div className="mode-toggle" style={{ flexShrink: 0 }}>
               {schema && (
-                <button type="button" className={editorView === 'visual' ? 'active' : ''} onClick={() => setEditorView('visual')}>
+                <button type="button" className={editorView === 'visual' ? 'active' : ''} onClick={() => setPreferredView('visual')}>
                   <Icon name="sliders-horizontal" size={12} /> Visual
                 </button>
               )}
-              <button type="button" className={editorView === 'xml' ? 'active' : ''} onClick={() => setEditorView('xml')}>
+              <button type="button" className={editorView === 'xml' ? 'active' : ''} onClick={() => setPreferredView('xml')}>
                 XML
               </button>
             </div>

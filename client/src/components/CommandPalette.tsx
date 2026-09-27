@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore, type TabKey } from '../store/useStore';
 import { useSharedFlowStore, type SharedFlowTabKey } from '../store/useSharedFlowStore';
 import { useUiStore } from '../store/useUiStore';
+import { useNavGuard } from '../lib/navGuard';
 import { fuzzyMatch, highlightRuns } from '../lib/fuzzy';
 import { Icon } from './Icon';
 
@@ -16,6 +17,20 @@ interface Command {
   keywords?: string;
   shortcut?: string;
   run: () => void;
+}
+
+/**
+ * These commands open a dialog that the sidebar owns, so they press the
+ * sidebar's own button rather than duplicating the state that raises it.
+ *
+ * The hook is a data attribute and not the button's aria-label, which is what
+ * it used to be: renaming "Import a proxy" to "Import a proxy…" — a change to
+ * the text a screen reader reads out, nothing more — silently stopped the
+ * palette command working, with no type error and no runtime error either.
+ * Label text belongs to the reader; this belongs to the code.
+ */
+function clickSidebarAction(action: 'new-proxy' | 'import-proxy' | 'new-shared-flow') {
+  document.querySelector<HTMLButtonElement>(`[data-action="${action}"]`)?.click();
 }
 
 /** Order groups appear in. Anything unlisted sorts last, alphabetically. */
@@ -71,9 +86,15 @@ export function CommandPalette() {
     const sfStore = useSharedFlowStore.getState;
     const list: Command[] = [];
 
+    // Opening from the palette replaces the open document just like the
+    // sidebar does, so it asks the same guard first.
+    const guard = useNavGuard.getState;
+
     const openProxyById = (id: string) => {
-      sfStore().closeSharedFlow();
-      proxyStore().openProxy(id);
+      guard().requestNavigation(() => {
+        sfStore().closeSharedFlow();
+        proxyStore().openProxy(id);
+      });
     };
 
     // Always available, with or without a document open: the times you want the
@@ -251,7 +272,14 @@ export function CommandPalette() {
           hint: f.condition || 'always matches',
           icon: 'git-fork',
           keywords: `${f.verb ?? ''} ${f.pathValue ?? ''}`,
-          run: () => proxyStore().setActiveTab('proxyEndpoint'),
+          /* Opening the tab is not the same as going to the flow: on a
+             thirteen-flow proxy that dropped you at the top of the section
+             with the thing you just searched for somewhere below the fold.
+             The section expands it and scrolls to it. */
+          run: () => {
+            proxyStore().setActiveTab('proxyEndpoint');
+            useUiStore.getState().revealFlow(f.id);
+          },
         })
       );
       currentProxy.targets.forEach((t) =>
@@ -286,7 +314,7 @@ export function CommandPalette() {
       group: 'Actions',
       label: 'New proxy',
       icon: 'plus',
-      run: () => document.querySelector<HTMLButtonElement>('[aria-label="New proxy"]')?.click(),
+      run: () => clickSidebarAction('new-proxy'),
     });
     list.push({
       id: 'act-import-proxy',
@@ -294,14 +322,14 @@ export function CommandPalette() {
       label: 'Import a proxy',
       hint: 'From a .zip, an OpenAPI spec, or a curl command',
       icon: 'upload',
-      run: () => document.querySelector<HTMLButtonElement>('[aria-label="Import a proxy"]')?.click(),
+      run: () => clickSidebarAction('import-proxy'),
     });
     list.push({
       id: 'act-new-sf',
       group: 'Actions',
       label: 'New shared flow',
       icon: 'git-branch',
-      run: () => document.querySelector<HTMLButtonElement>('[aria-label="New shared flow"]')?.click(),
+      run: () => clickSidebarAction('new-shared-flow'),
     });
 
     proxies.forEach((p) =>
@@ -322,10 +350,11 @@ export function CommandPalette() {
         label: sf.name,
         hint: `${sf.stepCount} step${sf.stepCount === 1 ? '' : 's'} · ${sf.policyCount} polic${sf.policyCount === 1 ? 'y' : 'ies'}`,
         icon: 'git-branch',
-        run: () => {
-          proxyStore().closeProxy();
-          sfStore().openSharedFlow(sf.id);
-        },
+        run: () =>
+          guard().requestNavigation(() => {
+            proxyStore().closeProxy();
+            sfStore().openSharedFlow(sf.id);
+          }),
       })
     );
     templates.forEach((t) =>

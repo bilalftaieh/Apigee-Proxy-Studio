@@ -765,21 +765,29 @@ export function TestsTab() {
             const running = testRunningId === t.id;
             const dotColor = status ? STATUS_META[status].color : 'var(--text-3)';
             return (
-              <div key={t.id} className={`test-list-item ${selected?.id === t.id ? 'active' : ''}`} onClick={() => setSelectedTestId(t.id)}>
-                {running ? <span className="spinner spinner-sm" /> : <span className="test-status-dot" style={{ background: dotColor }} />}
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div className="test-list-item-name mono">
-                    {t.name}
-                    {t.generated && (
-                      <span className="field-hint" style={{ marginLeft: 6 }} title="Generated — will be replaced by the next regeneration unless edited">
-                        <Icon name="wand-2" size={10} />
-                      </span>
-                    )}
+              <div key={t.id} className={`test-list-item ${selected?.id === t.id ? 'active' : ''}`}>
+                <button
+                  type="button"
+                  className="test-list-item-main"
+                  aria-current={selected?.id === t.id || undefined}
+                  title={`${t.name} — ${t.request.verb} ${t.request.pathSuffix}`}
+                  onClick={() => setSelectedTestId(t.id)}
+                >
+                  {running ? <span className="spinner spinner-sm" /> : <span className="test-status-dot" style={{ background: dotColor }} />}
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div className="test-list-item-name mono">
+                      {t.name}
+                      {t.generated && (
+                        <span className="field-hint" style={{ marginLeft: 6 }} title="Generated — will be replaced by the next regeneration unless edited">
+                          <Icon name="wand-2" size={10} />
+                        </span>
+                      )}
+                    </div>
+                    <div className="test-list-item-request">
+                      {t.request.verb} {t.request.pathSuffix}
+                    </div>
                   </div>
-                  <div className="test-list-item-request">
-                    {t.request.verb} {t.request.pathSuffix}
-                  </div>
-                </div>
+                </button>
                 <button
                   className="icon-btn"
                   onClick={(e) => {

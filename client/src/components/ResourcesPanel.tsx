@@ -218,16 +218,20 @@ export function ResourcesPanel({
           {resources.map((r) => {
             const refCount = referencingPolicies(r, policies).length;
             return (
-              <div
-                key={r.id}
-                className={`policy-list-item ${selected?.id === r.id ? 'active' : ''}`}
-                onClick={() => onSelect(r.id)}
-              >
-                <Icon name="file-code" size={14} color="var(--text-3)" style={{ flexShrink: 0 }} />
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div className="policy-list-item-name mono">{r.path.split('/').pop()}</div>
-                  <div className="policy-list-item-type mono">{r.path}</div>
-                </div>
+              <div key={r.id} className={`policy-list-item ${selected?.id === r.id ? 'active' : ''}`}>
+                <button
+                  type="button"
+                  className="policy-list-item-main"
+                  aria-current={selected?.id === r.id || undefined}
+                  title={r.path}
+                  onClick={() => onSelect(r.id)}
+                >
+                  <Icon name="file-code" size={14} color="var(--text-3)" style={{ flexShrink: 0 }} />
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div className="policy-list-item-name mono">{r.path.split('/').pop()}</div>
+                    <div className="policy-list-item-type mono">{r.path}</div>
+                  </div>
+                </button>
                 <span className="field-hint" style={{ flexShrink: 0 }} title="Policies referencing this file">
                   {refCount > 0 ? `${refCount}×` : 'unused'}
                 </span>

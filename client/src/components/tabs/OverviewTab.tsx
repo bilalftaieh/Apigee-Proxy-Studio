@@ -37,18 +37,6 @@ export function OverviewTab() {
       </div>
 
       <div className="card">
-        <h4 className="card-title">
-          <Icon name="list-tree" size={15} /> Structure
-        </h4>
-        <p className="card-subtitle">
-          {proxy.targets.length} target endpoint{proxy.targets.length === 1 ? '' : 's'}, {proxy.flows.length} proxy-level
-          conditional flow{proxy.flows.length === 1 ? '' : 's'}, {proxy.policies.length} polic
-          {proxy.policies.length === 1 ? 'y' : 'ies'}. Configure the ProxyEndpoint and each TargetEndpoint's own
-          PreFlow, conditional flows and PostFlow on their respective tabs above.
-        </p>
-      </div>
-
-      <div className="card">
         <div className="row-between" style={{ marginBottom: 4 }}>
           <div>
             <h4 className="card-title">

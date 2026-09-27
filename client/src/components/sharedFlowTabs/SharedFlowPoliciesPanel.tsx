@@ -120,13 +120,15 @@ export function SharedFlowPoliciesPanel() {
                       key={p.id}
                       className={`policy-list-item ${selected?.id === p.id ? 'active' : ''}`}
                       data-cat={policyCategory(p.type, type?.category)}
-                      onClick={() => setSelectedPolicyId(p.id)}
                     >
-                      <span
-                        className="policy-cat"
-                        data-cat={policyCategory(p.type, type?.category)}
-                        title={type?.category ? `${type.category} policy` : undefined}
+                      <button
+                        type="button"
+                        className="policy-list-item-main"
+                        aria-current={selected?.id === p.id || undefined}
+                        title={`${p.name} — ${type?.label || p.type}`}
+                        onClick={() => setSelectedPolicyId(p.id)}
                       >
+                      <span className="policy-cat" data-cat={policyCategory(p.type, type?.category)}>
                         {policyAbbr(p.type)}
                       </span>
                       <div style={{ minWidth: 0, flex: 1 }}>
@@ -150,6 +152,7 @@ export function SharedFlowPoliciesPanel() {
                           )}
                         </div>
                       </div>
+                      </button>
                       <button
                         className="icon-btn"
                         onClick={(e) => {

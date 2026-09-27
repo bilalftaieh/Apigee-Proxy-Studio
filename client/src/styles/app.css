@@ -208,6 +208,92 @@
   flex: 0 0 auto;
   justify-content: center;
 }
+
+/* ---------- The collapsed rail's flyout ----------
+
+   Collapsed, every row is reduced to its type icon, and a type icon is the one
+   thing a list of proxies has in common: eleven identical waypoints, then four
+   identical branches. Only the open one was distinguishable, and the only way
+   to read any other was to hover it and wait for the browser's tooltip — one
+   row at a time, which is not scanning.
+
+   A two-letter monogram was the obvious alternative and is worse than nothing
+   here: five of this workspace's proxies begin "infath-out-", so five rows
+   would carry a confident, identical "IN". What the names need is room, so
+   pointing at the rail gives them room — it widens over the editor rather than
+   pushing it, and drops back the moment the pointer leaves.
+
+   Hovering is delayed; reaching it with the keyboard is not, because arriving
+   by Tab is deliberate in a way that crossing the rail with the mouse is not. */
+.shell[data-sidebar='collapsed'] .sidebar {
+  position: relative;
+  z-index: 30;
+  /* No delay on the way out, so leaving feels immediate. The delay going in is
+     added by the hover rule below. */
+  transition: width 0.12s ease 0s, box-shadow 0.12s ease 0s;
+}
+
+.shell[data-sidebar='collapsed'] .sidebar:hover,
+.shell[data-sidebar='collapsed'] .sidebar:focus-within {
+  /* Wider than the docked sidebar's 272px, because this one is not paying for
+     its width — it floats over the editor instead of taking a column from it.
+     At 272 nine of this workspace's twenty-one rows were still ellipsized,
+     which would have made the flyout a slower way of reading the same
+     truncated names. 320 clears every proxy and shared flow name; the
+     templates, whose names are sentences, still elide and have their tooltip. */
+  width: 320px;
+  box-shadow: var(--shadow-lg);
+  border-right-color: var(--border-strong);
+}
+.shell[data-sidebar='collapsed'] .sidebar:hover {
+  transition-delay: 0.35s;
+}
+/* Tabbing in is intentional — open at once. Listed after the hover rule so it
+   wins when a row is both hovered and focused. */
+.shell[data-sidebar='collapsed'] .sidebar:focus-within {
+  transition-delay: 0s;
+}
+
+/* While it is open it is the full sidebar again. */
+.shell[data-sidebar='collapsed'] .sidebar:hover .nav-item-body,
+.shell[data-sidebar='collapsed'] .sidebar:focus-within .nav-item-body {
+  display: flex;
+}
+.shell[data-sidebar='collapsed'] .sidebar:hover .sidebar-section-head,
+.shell[data-sidebar='collapsed'] .sidebar:focus-within .sidebar-section-head {
+  display: flex;
+}
+.shell[data-sidebar='collapsed'] .sidebar:hover .empty-hint,
+.shell[data-sidebar='collapsed'] .sidebar:focus-within .empty-hint {
+  display: block;
+}
+.shell[data-sidebar='collapsed'] .sidebar:hover .nav-item-actions,
+.shell[data-sidebar='collapsed'] .sidebar:focus-within .nav-item-actions {
+  display: flex;
+}
+.shell[data-sidebar='collapsed'] .sidebar:hover .nav-item,
+.shell[data-sidebar='collapsed'] .sidebar:focus-within .nav-item {
+  justify-content: flex-start;
+  padding: 6px 8px 6px 9px;
+}
+.shell[data-sidebar='collapsed'] .sidebar:hover .nav-item-main,
+.shell[data-sidebar='collapsed'] .sidebar:focus-within .nav-item-main {
+  flex: 1;
+  justify-content: flex-start;
+}
+/* The rules standing in for the missing section headings are redundant once
+   the headings themselves are back. */
+.shell[data-sidebar='collapsed'] .sidebar:hover .sidebar-section + .sidebar-section,
+.shell[data-sidebar='collapsed'] .sidebar:focus-within .sidebar-section + .sidebar-section {
+  border-top: 0;
+  padding-top: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell[data-sidebar='collapsed'] .sidebar {
+    transition: none;
+  }
+}
 .sidebar {
   background: var(--bg-1);
   border-right: 1px solid var(--border-strong);
@@ -1648,9 +1734,19 @@
 }
 
 /* ---------- Policies tab layout ---------- */
+/* The list column used to be a flat 260px at every window size, which left
+   136px for the name once the chip, the gap and the row actions took their
+   share. On a real proxy that truncated 17 of 27 names — eight of them rows
+   that then read identically ("AM-Set-PaymentInqu…", "AM-Set-MT940Statem…"),
+   so the list could not tell you which policy was which. Meanwhile the editor
+   beside it was 890px wide for a form that needs about half that.
+
+   Tying the column to the viewport spends the surplus where it is short. The
+   260px floor is the old width, so nothing narrows; the 400px ceiling is where
+   the longest names in practice stop being cut. */
 .policies-layout {
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: clamp(260px, 26vw, 400px) 1fr;
   gap: 18px;
   height: 100%;
   min-height: 0;
@@ -1791,8 +1887,91 @@
   height: var(--row-h);
   padding: 0 8px 0 9px;
   border-left: 3px solid transparent;
-  cursor: pointer;
   transition: background 0.12s ease;
+  /* Anchors the stretched ::after below and the raised actions beside it. */
+  position: relative;
+}
+
+/* Same construction as .nav-item-main in the sidebar, and for the same reason:
+   these rows used to be a bare div with onClick, which meant the list you
+   select policies, resources and tests from could not be reached by keyboard at
+   all. Tab ran through 54 Duplicate/Delete buttons on a 27-policy proxy and
+   never once landed on something that opened a policy.
+
+   The selectable part is a real <button> whose ::after covers the row, so the
+   whole strip stays clickable; the per-row actions are siblings stacked above
+   that overlay. role="button" on the row itself is the other obvious fix and is
+   the wrong one — a button cannot contain interactive descendants, and it folds
+   "Duplicate policy Delete policy" into the row's own accessible name. */
+.policy-list-item-main,
+.test-list-item-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  /* Reset: this is a <button> that has to look like the row it fills. */
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.policy-list-item-main::after,
+.test-list-item-main::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+/* The ::after covers the row, so the row's own :hover still fires — but the
+   focus ring has to move to the row, or it would trace the text only. */
+.policy-list-item-main:focus-visible,
+.test-list-item-main:focus-visible {
+  outline: none;
+}
+.policy-list-item:has(.policy-list-item-main:focus-visible),
+.test-list-item:has(.test-list-item-main:focus-visible) {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: -2px;
+}
+
+/* Above the stretched overlay, or it would swallow every click meant for these. */
+.policy-list-item > .icon-btn,
+.policy-list-item > .field-hint,
+.test-list-item > .icon-btn {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+/* Hidden until the row is hovered or holds focus — the same trade the sidebar
+   makes. These two buttons were 44px of a 136px name column, which is why 17 of
+   27 policy names on a real proxy rendered as "AM-Set-PaymentInqu…": eight rows
+   that read identically for the first twenty characters. The width is worth
+   more to the names than to two actions that are one hover away. */
+.policy-list-item > .icon-btn,
+.test-list-item > .icon-btn {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.policy-list-item:hover > .icon-btn,
+.policy-list-item:focus-within > .icon-btn,
+.test-list-item:hover > .icon-btn,
+.test-list-item:focus-within > .icon-btn {
+  opacity: 1;
+}
+/* Touch and other devices with no hover have no way to reveal them. */
+@media (hover: none) {
+  .policy-list-item > .icon-btn,
+  .test-list-item > .icon-btn {
+    opacity: 1;
+  }
 }
 .policy-list-item:nth-child(even) {
   background: var(--bg-1);
@@ -1961,7 +2140,8 @@
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: var(--bg-1);
-  cursor: pointer;
+  /* Anchors .test-list-item-main's stretched ::after. */
+  position: relative;
   transition: all 0.12s ease;
 }
 .test-list-item:hover {
@@ -2246,9 +2426,19 @@
 }
 
 /* ---------- Flows tab ---------- */
+/* minmax(0, 1fr), not 1fr. A bare `1fr` is `minmax(auto, 1fr)`: the track will
+   not shrink below its content's min-content width, so one wide child stops
+   being clipped and starts pushing the whole grid past its container instead.
+   Here that child is the "Attach a policy…" select below, whose min-content is
+   its longest option — a policy name. On a real proxy that measured 279px, and
+   with the Attach button beside it the left track came out at 354.7px against
+   the right one's 339.4px, so the columns overflowed the tab panel by 17px and
+   gave it a horizontal scrollbar. The floor of 0 lets both tracks share the
+   row evenly and leaves the shrinking to the children, which is where the
+   ellipsis rules already are. */
 .flow-columns {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 18px;
 }
 
@@ -2376,6 +2566,12 @@
 }
 .step-add-row select {
   flex: 1;
+  /* A select's automatic minimum is as wide as its widest option, and the
+     options here are policy names. Without this the select simply overflows
+     its column instead of the grid overflowing the panel — the same 17px, just
+     moved somewhere harder to see. Closed, it ellipsizes; open, the list is
+     full width regardless. */
+  min-width: 0;
   background: var(--bg-2);
   border: 1px dashed var(--border-strong);
   border-radius: var(--radius-sm);
@@ -2558,6 +2754,106 @@
   gap: 10px;
   margin-bottom: 12px;
 }
+
+/* A closed card is a row, not a card with nothing in it: the 16px padding and
+   the 12px gap under the head were sized for a body that is no longer there,
+   and thirteen of them stacked up read as thirteen empty boxes. */
+.flow-card[data-collapsed] {
+  padding: 8px 12px;
+}
+.flow-card[data-collapsed] .flow-card-head {
+  margin-bottom: 0;
+}
+
+/* Position in the match order. The subtitle has always said these are matched
+   top-to-bottom; this is the only thing that says which one you are looking
+   at, and it matters most when the neighbours are collapsed off screen. */
+.flow-order-index {
+  flex-shrink: 0;
+  min-width: 20px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  background: var(--bg-3);
+  border-radius: var(--radius-sm);
+  padding: 2px 5px;
+}
+
+.flow-collapse-btn {
+  flex-shrink: 0;
+}
+
+/* Stands in for the description input while the card is closed. Styled as a
+   line of text rather than a control, because it is one — the click target is
+   incidental, and a row of thirteen buttons shaped like the description pill
+   would read as thirteen things to fill in. */
+.flow-card-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  margin: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.flow-card-summary:hover {
+  background: var(--bg-3);
+  border-color: var(--border);
+}
+/* The three parts do not compete equally. The condition is why the flow
+   exists, so it takes the width it needs and yields only when the row itself
+   runs out; the description is the one part that repeats what the name already
+   suggests, so it absorbs whatever is left and gives it back first. Capping
+   the condition at a fraction of the row instead had it truncated on a 1000px
+   window while an optional description sat beside it with room to spare. */
+.flow-card-summary-route {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text-1);
+}
+.flow-card-summary-steps {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+.flow-card-summary-desc {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+/* Below this the description has already been squeezed to nothing by the two
+   parts that outrank it, and all it still costs the row is the gap beside it —
+   which was enough to clip the condition. Drop it rather than render a zero
+   width element; the name and the condition are both readable again, and the
+   description is on the card once it is open. */
+@media (max-width: 1200px) {
+  .flow-card-summary-desc {
+    display: none;
+  }
+}
+/* The flow's name is the one thing in this row that has to be readable in
+   full: several of them on a real proxy share a long prefix and differ only at
+   the end ("ARB - MT-940Statement" / "ARB - MT-940ExtendedStatement"), so a
+   fixed 200px cut them exactly where they stop being distinguishable. It takes
+   what the row can spare now, within bounds, in both the open and closed
+   states — the description field beside it flexes too and has far more slack. */
 .flow-card-head input.flow-name {
   font-size: 14px;
   font-weight: 700;
@@ -2567,8 +2863,13 @@
   padding: 2px 0;
   color: var(--text-0);
   outline: none;
-  flex-shrink: 0;
-  width: 200px;
+  flex: 1 1 240px;
+  min-width: 140px;
+  /* Scales with the window rather than sitting at a flat 340px: on a 1000px
+     window that ceiling let the name take everything the row could spare and
+     left the condition beside it truncated instead. Both matter; neither
+     should win outright. */
+  max-width: clamp(200px, 24vw, 340px);
 }
 .flow-card-head input.flow-name:focus {
   border-bottom-color: var(--accent-blue);
@@ -2578,7 +2879,7 @@
   gap: 2px;
 }
 .flow-card-head input.flow-desc-input {
-  flex: 1;
+  flex: 1 1 180px;
   min-width: 0;
   font-size: 12px;
   font-style: italic;

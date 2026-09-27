@@ -4,6 +4,7 @@ import { useSharedFlowStore } from '../../store/useSharedFlowStore';
 import { api } from '../../api/client';
 import { Icon } from '../Icon';
 import { setupApigeeMonaco } from '../../lib/monacoApigee';
+import { READ_ONLY_EDITOR_OPTIONS } from '../../lib/monacoLayout';
 
 function groupFiles(paths: string[]) {
   const groups = new Map<string, string[]>();
@@ -85,16 +86,7 @@ export function SharedFlowPreviewPanel() {
               theme="apigee-dark"
               beforeMount={setupApigeeMonaco}
               value={selected ? files[selected] : ''}
-              options={{
-                readOnly: true,
-                fontSize: 13,
-                fontFamily: 'JetBrains Mono, monospace',
-                minimap: { enabled: false },
-                scrollBeyondLastLine: false,
-                automaticLayout: true,
-                padding: { top: 14 },
-                renderLineHighlight: 'none',
-              }}
+              options={READ_ONLY_EDITOR_OPTIONS}
             />
           </div>
         )}

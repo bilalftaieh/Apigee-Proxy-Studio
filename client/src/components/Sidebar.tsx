@@ -9,6 +9,7 @@ import { NewSharedFlowModal } from './NewSharedFlowModal';
 import { UseTemplateModal } from './UseTemplateModal';
 import { ImportProxyModal } from './ImportProxyModal';
 import { ConfirmModal } from './ConfirmModal';
+import { useNavGuard } from '../lib/navGuard';
 import type { Template } from '../types/proxy';
 
 /**
@@ -40,6 +41,8 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
   const openWorkspace = useWorkspaceStore((s) => s.openWorkspace);
   const closeWorkspace = useWorkspaceStore((s) => s.closeWorkspace);
 
+  const requestNavigation = useNavGuard((s) => s.requestNavigation);
+
   const [query, setQuery] = useState('');
   const [showNewProxy, setShowNewProxy] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -61,34 +64,52 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
     await deleteTemplateAction();
   };
 
+  // Every one of these replaces whatever document is open, so they all go
+  // through the guard rather than each growing its own check.
   const handleOpenProxy = (id: string) => {
-    closeWorkspace();
-    closeSharedFlow();
-    openProxy(id);
+    requestNavigation(() => {
+      closeWorkspace();
+      closeSharedFlow();
+      openProxy(id);
+    });
   };
 
   const handleOpenSharedFlow = (id: string) => {
-    closeWorkspace();
-    closeProxy();
-    openSharedFlow(id);
+    requestNavigation(() => {
+      closeWorkspace();
+      closeProxy();
+      openSharedFlow(id);
+    });
+  };
+
+  const handleToggleWorkspace = () => {
+    if (workspaceOpen) {
+      closeWorkspace();
+      return;
+    }
+    requestNavigation(openWorkspace);
   };
 
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    closeWorkspace();
-    closeSharedFlow();
-    importProxy(file);
+    requestNavigation(() => {
+      closeWorkspace();
+      closeSharedFlow();
+      importProxy(file);
+    });
   };
 
   const handleImportSharedFlowFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    closeWorkspace();
-    closeProxy();
-    importSharedFlow(file);
+    requestNavigation(() => {
+      closeWorkspace();
+      closeProxy();
+      importSharedFlow(file);
+    });
   };
 
   return (
@@ -109,8 +130,8 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
               type="button"
               className="nav-item-main"
               aria-current={workspaceOpen || undefined}
-              onClick={() => (workspaceOpen ? closeWorkspace() : openWorkspace())}
-              title={collapsed ? 'Workspace Audit' : undefined}
+              onClick={handleToggleWorkspace}
+              title="Workspace Audit — base paths, backends, shared flow usage, house rules"
             >
               <span className="nav-item-icon">
                 <Icon name="radar" size={16} />
@@ -134,15 +155,23 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
                 style={{ display: 'none' }}
                 onChange={handleImportFile}
               />
+              {/* The trailing ellipsis is doing real work: this button and the
+                  one in Shared Flows below are the same glyph in the same
+                  place, but this one opens a chooser with five sources and
+                  that one goes straight to a file dialog. The convention for
+                  "this asks you something first" is the only thing telling
+                  them apart before you click. The title lists the sources,
+                  which the old one under-sold — it named three of five. */}
               <button
                 className="icon-btn"
+                data-action="import-proxy"
                 onClick={() => setShowImport(true)}
-                aria-label="Import a proxy"
-                title="Import from a .zip bundle, an OpenAPI/Swagger spec, or a curl command"
+                aria-label="Import a proxy…"
+                title="Import a proxy… — from an Apigee bundle (.zip), an OpenAPI/Swagger spec, a curl command, a Postman collection or a WSDL"
               >
                 <Icon name="upload" size={15} />
               </button>
-              <button className="icon-btn" onClick={() => setShowNewProxy(true)} aria-label="New proxy">
+              <button className="icon-btn" data-action="new-proxy" onClick={() => setShowNewProxy(true)} aria-label="New proxy">
                 <Icon name="plus" size={16} />
               </button>
             </div>
@@ -163,7 +192,7 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
                 className="nav-item-main"
                 aria-current={currentProxy?.id === p.id || undefined}
                 onClick={() => handleOpenProxy(p.id)}
-                title={collapsed ? `${p.name} — ${p.basePath}` : undefined}
+                title={`${p.name} — ${p.basePath}`}
               >
                 <span className="nav-item-icon">
                   <Icon name="waypoints" size={16} />
@@ -211,12 +240,12 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
               <button
                 className="icon-btn"
                 onClick={() => importSharedFlowInputRef.current?.click()}
-                aria-label="Import a shared flow"
-                title="Import from a sharedflowbundle .zip"
+                aria-label="Import a shared flow bundle"
+                title="Import a shared flow bundle — opens a file dialog; expects a sharedflowbundle .zip"
               >
                 <Icon name="upload" size={15} />
               </button>
-              <button className="icon-btn" onClick={() => setShowNewSharedFlow(true)} aria-label="New shared flow">
+              <button className="icon-btn" data-action="new-shared-flow" onClick={() => setShowNewSharedFlow(true)} aria-label="New shared flow">
                 <Icon name="plus" size={16} />
               </button>
             </div>
@@ -235,7 +264,7 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
                 className="nav-item-main"
                 aria-current={currentSharedFlow?.id === sf.id || undefined}
                 onClick={() => handleOpenSharedFlow(sf.id)}
-                title={collapsed ? sf.name : undefined}
+                title={`${sf.name} — ${sf.stepCount} step${sf.stepCount === 1 ? '' : 's'}`}
               >
                 <span className="nav-item-icon">
                   <Icon name="git-branch" size={16} />
@@ -274,13 +303,24 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
           <div className="sidebar-section-head">
             <span className="sidebar-section-title">Templates ({templates.length})</span>
           </div>
+
+          {/* Proxies and Shared Flows both explain themselves when empty; this
+              section used to render a bare heading and nothing else, which
+              reads as something failing to load rather than as a section with
+              nothing in it yet. */}
+          {templates.length === 0 && (
+            <div className="empty-hint">
+              No templates — open a proxy and choose Save as Template to reuse its policies and flows.
+            </div>
+          )}
+
           {templates.map((t) => (
             <div key={t.id} className="nav-item">
               <button
                 type="button"
                 className="nav-item-main"
                 onClick={() => setTemplateToUse(t)}
-                title={collapsed ? t.name : undefined}
+                title={t.description ? `${t.name} — ${t.description}` : t.name}
               >
                 <span className="nav-item-icon">
                   <Icon name="layout-template" size={16} />
