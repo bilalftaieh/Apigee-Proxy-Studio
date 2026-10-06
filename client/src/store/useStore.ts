@@ -16,6 +16,7 @@ import { createUndoHistory, type UndoSlice } from './undoHistory';
 import { createLogger } from '../lib/log/logger';
 import type {
   AiReviewResult,
+  AiStatus,
   BundleResource,
   EnvironmentTargetOverride,
   FaultRule,
@@ -89,6 +90,17 @@ interface StoreState extends UndoSlice {
    */
   aiReview: AiReviewResult | null;
   reviewing: boolean;
+  /**
+   * Whether the server has an API key and which model it is using.
+   *
+   * Lives here rather than in each AI surface because it was previously fetched
+   * by three components running byte-identical effects (the policy gallery, the
+   * lint tab and the review panel), all of which discarded everything but
+   * `configured`. One copy means the model picker can appear in all three and
+   * they cannot disagree about what is running. Null until bootstrap answers,
+   * and on a server with no key it simply stays `configured: false`.
+   */
+  aiStatus: AiStatus | null;
   linting: boolean;
   prerequisites: Prerequisite[] | null;
   prerequisitesLoading: boolean;
@@ -112,10 +124,10 @@ interface StoreState extends UndoSlice {
   deleteProxy: (id: string) => Promise<void>;
   duplicateProxy: (id: string) => Promise<void>;
   importProxy: (file: File) => Promise<void>;
-  importCurl: (curl: string) => Promise<void>;
-  importOpenApi: (spec: string) => Promise<void>;
-  importPostman: (collection: string) => Promise<void>;
-  importWsdl: (wsdl: string) => Promise<void>;
+  importCurl: (curl: string, templateId?: string) => Promise<void>;
+  importOpenApi: (spec: string, templateId?: string) => Promise<void>;
+  importPostman: (collection: string, templateId?: string) => Promise<void>;
+  importWsdl: (wsdl: string, templateId?: string) => Promise<void>;
   loadHistory: () => Promise<void>;
   restoreSnapshot: (snapshotId: string) => Promise<void>;
 
@@ -135,6 +147,9 @@ interface StoreState extends UndoSlice {
   saveProxy: () => Promise<void>;
   runLint: () => Promise<LintResult | null>;
   runAiReview: () => Promise<void>;
+  loadAiStatus: () => Promise<void>;
+  /** Switches the model on the server, then mirrors what it reports back. */
+  setAiModel: (model: string) => Promise<void>;
   toggleLintExclude: (ruleId: string) => Promise<void>;
   loadPrerequisites: () => Promise<void>;
   addTest: () => void;
@@ -334,7 +349,11 @@ async function openImportedProxy(
   get: () => StoreState,
   proxy: Proxy,
   warnings: string[],
-  successMessage: string
+  successMessage: string,
+  // What a template actually contributed, when one was applied at import. Said
+  // out loud because it is rarely the template's full contents — whatever
+  // collided with the artifact was dropped, and the warnings explain each one.
+  templateApplied?: { name: string; summary: string }
 ) {
   await get().refreshProxies();
   set({
@@ -352,6 +371,9 @@ async function openImportedProxy(
     selectedResourceId: null,
   });
   get().pushToast(successMessage, 'success');
+  if (templateApplied) {
+    get().pushToast(`Applied the "${templateApplied.name}" template — ${templateApplied.summary}.`, 'success');
+  }
   warnings.forEach((w) => get().pushToast(w, 'info'));
 }
 
@@ -417,6 +439,7 @@ export const useStore = create<StoreState>((rawSet, get) => {
     lintResult: null, aiReview: null,
     linting: false,
     reviewing: false,
+    aiStatus: null,
     prerequisites: null,
     prerequisitesLoading: false,
     historyList: [],
@@ -442,6 +465,7 @@ export const useStore = create<StoreState>((rawSet, get) => {
             const policyChains = await api.listPolicyChains();
             set({ policyChains });
           })(),
+          get().loadAiStatus(),
         ]);
       } catch (err) {
         get().pushToast(`Couldn't load your workspace — ${(err as Error).message}`, 'error');
@@ -576,37 +600,37 @@ export const useStore = create<StoreState>((rawSet, get) => {
       }
     },
 
-    async importCurl(curl) {
+    async importCurl(curl, templateId) {
       try {
-        const { proxy, warnings } = await api.importCurl(curl);
-        await openImportedProxy(set, get, proxy, warnings, `Scaffolded "${proxy.name}" from your curl command`);
+        const { proxy, warnings, templateApplied } = await api.importCurl(curl, templateId);
+        await openImportedProxy(set, get, proxy, warnings, `Scaffolded "${proxy.name}" from your curl command`, templateApplied);
       } catch (err) {
         get().pushToast((err as Error).message, 'error');
       }
     },
 
-    async importOpenApi(spec) {
+    async importOpenApi(spec, templateId) {
       try {
-        const { proxy, warnings } = await api.importOpenApi(spec);
-        await openImportedProxy(set, get, proxy, warnings, `Imported "${proxy.name}" from the OpenAPI spec`);
+        const { proxy, warnings, templateApplied } = await api.importOpenApi(spec, templateId);
+        await openImportedProxy(set, get, proxy, warnings, `Imported "${proxy.name}" from the OpenAPI spec`, templateApplied);
       } catch (err) {
         get().pushToast((err as Error).message, 'error');
       }
     },
 
-    async importPostman(collection) {
+    async importPostman(collection, templateId) {
       try {
-        const { proxy, warnings } = await api.importPostman(collection);
-        await openImportedProxy(set, get, proxy, warnings, `Imported "${proxy.name}" from the Postman collection`);
+        const { proxy, warnings, templateApplied } = await api.importPostman(collection, templateId);
+        await openImportedProxy(set, get, proxy, warnings, `Imported "${proxy.name}" from the Postman collection`, templateApplied);
       } catch (err) {
         get().pushToast((err as Error).message, 'error');
       }
     },
 
-    async importWsdl(wsdl) {
+    async importWsdl(wsdl, templateId) {
       try {
-        const { proxy, warnings } = await api.importWsdl(wsdl);
-        await openImportedProxy(set, get, proxy, warnings, `Imported "${proxy.name}" from the WSDL`);
+        const { proxy, warnings, templateApplied } = await api.importWsdl(wsdl, templateId);
+        await openImportedProxy(set, get, proxy, warnings, `Imported "${proxy.name}" from the WSDL`, templateApplied);
       } catch (err) {
         get().pushToast((err as Error).message, 'error');
       }
@@ -762,6 +786,31 @@ export const useStore = create<StoreState>((rawSet, get) => {
         set({ aiReview: await api.generateAiReview({ proxy: current }), reviewing: false });
       } catch (err) {
         set({ reviewing: false });
+        get().pushToast((err as Error).message, 'error');
+      }
+    },
+
+    // Swallows its own failure rather than joining bootstrap's catch: a server
+    // that cannot answer this is a server with no AI, which is a supported
+    // configuration and not a workspace-load error worth a toast.
+    async loadAiStatus() {
+      try {
+        set({ aiStatus: await api.aiStatus() });
+      } catch {
+        set({ aiStatus: null });
+      }
+    },
+
+    async setAiModel(model) {
+      const previous = get().aiStatus?.model;
+      if (model === previous) return;
+      try {
+        // The server's answer is the source of truth, not the id we asked for —
+        // so the chip cannot end up claiming a model the server declined.
+        const aiStatus = await api.setAiModel(model);
+        set({ aiStatus });
+        get().pushToast(`Now using ${aiStatus.model}. Restart the server to go back to your .env setting.`, 'success');
+      } catch (err) {
         get().pushToast((err as Error).message, 'error');
       }
     },

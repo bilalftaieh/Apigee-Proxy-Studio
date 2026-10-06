@@ -13,16 +13,30 @@
     "dev": "concurrently -n SERVER,CLIENT -c yellow,cyan \"node --watch server/src/index.js\" \"node node_modules/vite/bin/vite.js client\"",
     "dev:server": "node --watch server/src/index.js",
     "dev:client": "node node_modules/vite/bin/vite.js client",
+    "prestart": "npm run free-ports",
+    "start": "node server/src/index.js",
+    "app": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/studio.ps1 start",
+    "app:status": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/studio.ps1 status",
+    "app:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/studio.ps1 stop",
+    "app:restart": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/studio.ps1 restart",
+    "app:install": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/studio.ps1 install",
+    "app:uninstall": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/studio.ps1 uninstall",
     "install:all": "npm install",
     "lint:templates": "node scripts/lint-policy-templates.mjs",
     "generate:policy-schemas": "node scripts/generate-policy-schemas.mjs",
+    "check:policy-schemas": "node scripts/generate-policy-schemas.mjs --check",
     "test:roundtrip": "node scripts/roundtrip.mjs",
     "build": "npm run build -w client",
     "test:ai": "node --test \"server/src/lib/ai/*.test.js\" \"server/src/routes/ai.test.js\"",
     "test:logging": "node --test \"server/src/lib/log/*.test.js\"",
+    "test:templates": "node --test \"server/src/lib/templateApply.test.js\"",
+    "test:policy-form": "node scripts/test-policy-form.mjs",
+    "test:policy-schemas": "node --test scripts/test-policy-schemas.mjs",
+    "test:conditions": "node --test \"server/src/lib/conditionEvaluator.test.js\" && node scripts/test-condition-lint.mjs",
     "logs": "powershell -NoProfile -Command \"Get-Content -Path server/logs/studio.log -Wait -Tail 40\""
   },
   "devDependencies": {
+    "@xmldom/xmldom": "^0.8.10",
     "concurrently": "^9.1.0"
   }
 }

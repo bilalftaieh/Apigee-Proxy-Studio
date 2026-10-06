@@ -1,5 +1,7 @@
 import { StepList } from './StepList';
 import { Icon } from './Icon';
+import { ConditionCheck } from './ConditionCheck';
+import { analyzeCondition, conditionTone } from '../lib/conditionLint';
 import type { StepLocation } from '../store/useStore';
 import type { FaultRule, FaultRules } from '../types/proxy';
 
@@ -70,7 +72,11 @@ export function FaultRulesSection({
         </div>
       )}
 
-      {rules.map((rule, i) => (
+      {rules.map((rule, i) => {
+        const analysis = analyzeCondition(rule.condition || '');
+        const tone = conditionTone(analysis);
+        const checkId = `fault-rule-condition-check-${rule.id}`;
+        return (
         <div className="flow-card" key={rule.id}>
           <div className="flow-card-head">
             <div className="flow-order-btns">
@@ -106,9 +112,18 @@ export function FaultRulesSection({
             <label>Condition</label>
             <input
               className="condition-input"
+              data-tone={tone}
+              aria-invalid={tone === 'error' || undefined}
+              aria-describedby={checkId}
               placeholder={'Leave blank to catch everything — e.g. error.message = "Received non success response code"'}
               value={rule.condition || ''}
               onChange={(e) => onUpdate(rule.id, { condition: e.target.value })}
+            />
+            <ConditionCheck
+              compact
+              analysis={analysis}
+              describedById={checkId}
+              fixFor={(issue) => () => onUpdate(rule.id, { condition: issue.fix!.condition })}
             />
           </div>
 
@@ -117,7 +132,8 @@ export function FaultRulesSection({
           </div>
           <StepList location={ruleStepLocation(rule.id)} steps={rule.steps} />
         </div>
-      ))}
+        );
+      })}
 
       <div className="flow-block-title" style={{ marginTop: rules.length ? 20 : 10 }}>
         <Icon name="shield" size={12} /> Default Fault Rule

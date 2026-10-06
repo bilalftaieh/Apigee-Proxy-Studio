@@ -370,7 +370,8 @@ export const POLICY_TYPES = [
     <ExposeHeaders>*</ExposeHeaders>
     <MaxAge>3628800</MaxAge>
     <AllowCredentials>false</AllowCredentials>
-    <GenerateErrorResponse>true</GenerateErrorResponse>
+    <GeneratePreflightResponse>true</GeneratePreflightResponse>
+    <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>
 </CORS>`,
   },
   {

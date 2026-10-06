@@ -30,7 +30,13 @@ const SILENT_PATHS = /^\/api\/logs(\/|$)/;
 // Health checks are frequent and uninteresting, but not invisible: kept at
 // trace so they are there if you go looking for whether the client could reach
 // the server at all.
-const TRACE_PATHS = /^\/api\/health$/;
+//
+// /api/build-id is the same shape of traffic but relentless: every page open
+// under the launcher's watch mode polls it on a timer, so at info it produced
+// ~170k lines a day and rotated real history out of a 5mb x 5 budget within
+// one session. Trace keeps it discoverable (LOG_FILE_LEVEL=trace) while
+// costing a single integer compare at the default levels.
+const TRACE_PATHS = /^\/api\/(health|build-id)$/;
 
 let counter = 0;
 const PROCESS_TAG = randomBytes(2).toString('hex');

@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid';
 import { proxiesStore, historyStore } from '../lib/storage.js';
 import { createBlankProxy, duplicateProxy, normalizeProxy } from '../lib/model.js';
 import { requireSafeId } from '../lib/validateId.js';
+import { applyTemplateToProxy, findTemplate } from '../lib/templateApply.js';
 
 const router = Router();
 router.param('id', requireSafeId);
@@ -57,6 +58,34 @@ router.delete('/proxies/:id', async (req, res) => {
   await proxiesStore.remove(req.params.id);
   await historyStore.removeAll(req.params.id);
   res.status(204).end();
+});
+
+/**
+ * Overlays a template's policy layer onto an existing proxy.
+ *
+ * The same merge the import routes run, exposed on its own so it also works
+ * for the bundle import (which deliberately refuses a template inline) and for
+ * any proxy already in the workspace — "apply our standard security template
+ * to this" is the more common ask than doing it at import time.
+ *
+ * `dryRun` returns the merged proxy without saving, so the UI can show what
+ * would change before anything is written. A real run snapshots first, exactly
+ * like PUT does, so it is undoable from the history panel.
+ */
+router.post('/proxies/:id/apply-template', async (req, res) => {
+  const existing = await proxiesStore.get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Proxy not found' });
+  const { templateId, dryRun } = req.body || {};
+  if (!templateId) return res.status(400).json({ error: 'templateId is required' });
+  const template = await findTemplate(templateId);
+  if (!template) return res.status(404).json({ error: 'Template not found' });
+
+  const { proxy, warnings, changes } = applyTemplateToProxy(normalizeProxy(existing), template);
+  if (dryRun) return res.json({ proxy, warnings, changes });
+
+  await historyStore.save(existing.id, { id: nanoid(10), savedAt: Date.now(), proxy: existing });
+  await proxiesStore.save(existing.id, proxy);
+  res.json({ proxy, warnings, changes });
 });
 
 router.post('/proxies/:id/duplicate', async (req, res) => {

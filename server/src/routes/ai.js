@@ -6,7 +6,14 @@ import { generatePolicy, previewRequest } from '../lib/ai/generatePolicy.js';
 import { fixFinding, previewFixRequest } from '../lib/ai/fixFinding.js';
 import { isStructuralFinding, resolveFixTarget } from '../lib/ai/fixTarget.js';
 import { previewReviewRequest, reviewProxy } from '../lib/ai/reviewProxy.js';
-import { AiNotConfiguredError, AiProviderError, isConfigured, providerInfo } from '../lib/ai/provider.js';
+import {
+  AiNotConfiguredError,
+  AiProviderError,
+  isConfigured,
+  listModels,
+  providerInfo,
+  setModel,
+} from '../lib/ai/provider.js';
 import { LeakError } from '../lib/ai/guard.js';
 
 const router = Router();
@@ -24,7 +31,14 @@ const MAX_FINDING_LENGTH = 4000;
 function sendError(res, err) {
   if (err instanceof AiNotConfiguredError) return res.status(503).json({ error: err.message });
   if (err instanceof LeakError) return res.status(500).json({ error: err.message, leak: true });
-  if (err instanceof AiProviderError) return res.status(502).json({ error: err.message });
+  if (err instanceof AiProviderError) {
+    // fallbackModel rides alongside the message rather than inside it: the
+    // message is prose shown to a person, and the id is something the UI acts
+    // on. Only a 503 ever sets it, and only when a lighter model exists.
+    return res
+      .status(502)
+      .json({ error: err.message, ...(err.fallbackModel ? { fallbackModel: err.fallbackModel } : {}) });
+  }
   return res.status(500).json({ error: err.message });
 }
 
@@ -149,6 +163,48 @@ async function resolveFixRequest(body) {
 // only ever produces a configuration error.
 router.get('/ai/status', (req, res) => {
   res.json(providerInfo());
+});
+
+/**
+ * Every model this key can use, asked of Google rather than listed here.
+ *
+ * Separate from /ai/status because it costs a network round trip and status is
+ * read on app start by every AI surface. The picker renders the vouched-for
+ * pair from status immediately and calls this when it opens, so the menu is
+ * never empty and never stale.
+ *
+ * Never fails: listModels() falls back to the built-in pair rather than
+ * throwing, because the moment someone opens this menu is the moment their
+ * model is already not working.
+ */
+router.get('/ai/models', async (req, res) => {
+  res.json(await listModels());
+});
+
+/**
+ * Switches the model for this server process.
+ *
+ * Mirrors POST /logs/level: validate, apply in memory, log the change, return
+ * what is now in force. Nothing is written to .env — the override lasts until
+ * the server restarts, which is the point. It exists so that a free tier that
+ * is congested right now does not cost someone the work sitting in their
+ * editor, not so the app can rewrite a file the user owns.
+ *
+ * Not gated on isConfigured(): choosing a model with no API key set is
+ * harmless, and refusing would make the picker dead on exactly the workspace
+ * where someone is getting set up.
+ *
+ * Deliberately NOT gated on a proxy's aiDisabled either — this is a
+ * process-wide capacity setting, not something one workspace's opt-out speaks
+ * for. That opt-out still blocks every endpoint that actually sends anything.
+ */
+router.post('/ai/model', (req, res) => {
+  try {
+    res.json(setModel(req.body?.model ?? null));
+  } catch (err) {
+    if (err instanceof RangeError) return res.status(400).json({ error: err.message });
+    sendError(res, err);
+  }
 });
 
 // Returns the exact payload /ai/policy would send, without sending it.

@@ -346,6 +346,7 @@ export function TargetEndpointTab() {
         stepLocation={(flowId, phase) => ({ scope: 'targetFlow', targetId: target.id, flowId, phase })}
         emptyHint="No conditional flows on this target — every request uses PreFlow → PostFlow as-is."
         phaseNumber={2}
+        basePath={proxy.basePath}
       />
 
       <div className="card">

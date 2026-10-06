@@ -2,6 +2,7 @@ import type {
   AiFixResult,
   AiPolicyResult,
   AiReviewResult,
+  AiModelList,
   AiPreview,
   AiStatus,
   BundleDiffResult,
@@ -85,7 +86,14 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    const error = new Error(body.error || `Request failed: ${res.status}`) as Error & { requestId?: string };
+    const error = new Error(body.error || `Request failed: ${res.status}`) as Error & {
+      requestId?: string;
+      fallbackModel?: string;
+    };
+    // Only /ai/* sets this, and only when the model it tried is at capacity and
+    // a lighter one exists. Carried on the error for the same reason requestId
+    // is: the message is prose for a person, this is something code acts on.
+    error.fallbackModel = body.fallbackModel || undefined;
     // Carried on the error rather than folded into its message: the message is
     // shown to the user in a toast and should stay readable, while anything
     // that catches this can log the id and tie the failure to the server's side
@@ -95,6 +103,21 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   }
   if (res.status === 204) return undefined as T;
   return res.json();
+}
+
+export interface TemplateChanges {
+  policies: number;
+  flowSteps: number;
+  flows: number;
+  faultRules: number;
+  resources: number;
+}
+
+interface ImportResult {
+  proxy: Proxy;
+  warnings: string[];
+  /** Present only when the import was given a templateId. */
+  templateApplied?: { name: string; summary: string; changes: TemplateChanges };
 }
 
 export const api = {
@@ -119,14 +142,17 @@ export const api = {
     }
     return res.json();
   },
-  importCurl: (curl: string) =>
-    request<{ proxy: Proxy; warnings: string[] }>('/proxies/import/curl', { method: 'POST', body: JSON.stringify({ curl }) }),
-  importOpenApi: (spec: string) =>
-    request<{ proxy: Proxy; warnings: string[] }>('/proxies/import/openapi', { method: 'POST', body: JSON.stringify({ spec }) }),
-  importPostman: (collection: string) =>
-    request<{ proxy: Proxy; warnings: string[] }>('/proxies/import/postman', { method: 'POST', body: JSON.stringify({ collection }) }),
-  importWsdl: (wsdl: string) =>
-    request<{ proxy: Proxy; warnings: string[] }>('/proxies/import/wsdl', { method: 'POST', body: JSON.stringify({ wsdl }) }),
+  // `templateId` is optional on the four artifact imports: the artifact gives
+  // the API surface, the template gives the policy layer on top of it. The zip
+  // import above takes none — a bundle is already a whole proxy.
+  importCurl: (curl: string, templateId?: string) =>
+    request<ImportResult>('/proxies/import/curl', { method: 'POST', body: JSON.stringify({ curl, templateId }) }),
+  importOpenApi: (spec: string, templateId?: string) =>
+    request<ImportResult>('/proxies/import/openapi', { method: 'POST', body: JSON.stringify({ spec, templateId }) }),
+  importPostman: (collection: string, templateId?: string) =>
+    request<ImportResult>('/proxies/import/postman', { method: 'POST', body: JSON.stringify({ collection, templateId }) }),
+  importWsdl: (wsdl: string, templateId?: string) =>
+    request<ImportResult>('/proxies/import/wsdl', { method: 'POST', body: JSON.stringify({ wsdl, templateId }) }),
   listProxyHistory: (id: string) => request<HistorySnapshotSummary[]>(`/proxies/${id}/history`),
   restoreProxyHistory: (id: string, snapshotId: string) =>
     request<Proxy>(`/proxies/${id}/history/${snapshotId}/restore`, { method: 'POST' }),
@@ -137,12 +163,24 @@ export const api = {
   deleteTemplate: (id: string) => request<void>(`/templates/${id}`, { method: 'DELETE' }),
   useTemplate: (id: string, data: { name: string; basePath?: string }) =>
     request<Proxy>(`/templates/${id}/use`, { method: 'POST', body: JSON.stringify(data) }),
+  // Overlays a template onto a proxy that already exists. `dryRun` computes
+  // the merge without saving, for showing what would change first.
+  applyTemplate: (id: string, templateId: string, dryRun = false) =>
+    request<{ proxy: Proxy; warnings: string[]; changes: TemplateChanges }>(`/proxies/${id}/apply-template`, {
+      method: 'POST',
+      body: JSON.stringify({ templateId, dryRun }),
+    }),
 
   // Reads every saved proxy and shared flow off disk server-side, so it
   // reflects saved state rather than whatever the editor is currently holding.
   auditWorkspace: () => request<WorkspaceAudit>('/workspace/audit'),
 
   aiStatus: () => request<AiStatus>('/ai/status'),
+  /** Every model this key can use, asked of Google. Never rejects. */
+  aiModels: () => request<AiModelList>('/ai/models'),
+  /** Switches the model for the running server. Passing null restores .env. */
+  setAiModel: (model: string | null) =>
+    request<AiStatus>('/ai/model', { method: 'POST', body: JSON.stringify({ model }) }),
   previewAiRequest: (body: { intent: string; policyType?: string | null; proxy: Proxy | null }) =>
     request<AiPreview>('/ai/preview', { method: 'POST', body: JSON.stringify(body) }),
   generateAiPolicy: (body: { intent: string; policyType?: string | null; proxy: Proxy | null }) =>

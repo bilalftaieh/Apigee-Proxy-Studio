@@ -2,6 +2,8 @@ import { useRef, useState } from 'react';
 import { Modal } from './Modal';
 import { Icon } from './Icon';
 import { useStore } from '../store/useStore';
+import { summarizeTemplate, describeContribution } from '../lib/templateSummary';
+import type { Template } from '../types/proxy';
 
 type Mode = 'choose' | 'curl' | 'openapi' | 'postman' | 'wsdl';
 
@@ -28,6 +30,68 @@ const HINTS = {
   },
 };
 
+/**
+ * Step 2 of every artifact import: the optional template overlay.
+ *
+ * An artifact (spec, WSDL, curl, collection) describes an API surface and
+ * carries no policy layer at all, so a template is the natural other half —
+ * picking one here means "scaffold these paths, then put our standard security
+ * and fault handling in front of them".
+ *
+ * Defaults to None, so an import that never touches this control behaves
+ * exactly as it did before. The counts are the template's own contents rather
+ * than a real merge (see summarizeTemplate) — hence "up to": anything that
+ * collides with what the artifact already brought is dropped server-side, and
+ * the toasts afterwards say what actually landed.
+ */
+function TemplateStep({
+  templates,
+  value,
+  onChange,
+  disabled,
+}: {
+  templates: Template[];
+  value: string;
+  onChange: (id: string) => void;
+  disabled: boolean;
+}) {
+  const selected = templates.find((t) => t.id === value);
+  const summary = selected ? describeContribution(summarizeTemplate(selected)) : '';
+
+  return (
+    <div className="field" style={{ marginBottom: 12 }}>
+      <label htmlFor="import-template">Apply a template (optional)</label>
+      <select
+        id="import-template"
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        <option value="">None — import the artifact as-is</option>
+        {templates.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.name}
+            {t.builtIn ? ' (built-in)' : ''}
+          </option>
+        ))}
+      </select>
+      <div className="field-hint">
+        {selected ? (
+          <>
+            {summary
+              ? `Adds up to ${summary} on top of the imported paths and target.`
+              : 'This template has no policies to add.'}{' '}
+            Your imported base path, flows and backend URL are always kept — anything the template
+            would have overwritten is reported after the import.
+          </>
+        ) : (
+          'Layer the policies, flow attachments and fault handling from a saved template on top of what gets imported.'
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Reusable form component for text-based imports (OpenAPI, Postman, WSDL)
 function TextImportForm({
   label,
@@ -43,6 +107,7 @@ function TextImportForm({
   error,
   onBack,
   onSubmit,
+  templateStep,
   submitLabel = 'Import proxy',
   importingLabel = 'Importing proxy...',
 }: {
@@ -59,6 +124,7 @@ function TextImportForm({
   error: string | null;
   onBack: () => void;
   onSubmit: () => void;
+  templateStep: React.ReactNode;
   submitLabel?: string;
   importingLabel?: string;
 }) {
@@ -109,6 +175,8 @@ function TextImportForm({
         </div>
       </div>
       
+      {templateStep}
+
       {error && (
         <p style={{ 
           color: 'var(--error-ink)', 
@@ -157,8 +225,11 @@ export function ImportProxyModal({ onClose, onPickZip }: { onClose: () => void; 
   const importOpenApi = useStore((s) => s.importOpenApi);
   const importPostman = useStore((s) => s.importPostman);
   const importWsdl = useStore((s) => s.importWsdl);
+  const templates = useStore((s) => s.templates);
 
   const [mode, setMode] = useState<Mode>('choose');
+  // '' means "no template" — the pre-existing behaviour, and the default.
+  const [templateId, setTemplateId] = useState('');
   const [curlText, setCurlText] = useState('');
   const [specText, setSpecText] = useState('');
   const [specFileName, setSpecFileName] = useState<string | null>(null);
@@ -184,7 +255,7 @@ export function ImportProxyModal({ onClose, onPickZip }: { onClose: () => void; 
     setBusy(true);
     setError(null);
     try {
-      await importCurl(curlText);
+      await importCurl(curlText, templateId || undefined);
       onClose();
     } catch (err) {
       setError((err as Error).message);
@@ -198,7 +269,7 @@ export function ImportProxyModal({ onClose, onPickZip }: { onClose: () => void; 
     setBusy(true);
     setError(null);
     try {
-      await importOpenApi(specText);
+      await importOpenApi(specText, templateId || undefined);
       onClose();
     } catch (err) {
       setError((err as Error).message);
@@ -212,7 +283,7 @@ export function ImportProxyModal({ onClose, onPickZip }: { onClose: () => void; 
     setBusy(true);
     setError(null);
     try {
-      await importPostman(postmanText);
+      await importPostman(postmanText, templateId || undefined);
       onClose();
     } catch (err) {
       setError((err as Error).message);
@@ -226,7 +297,7 @@ export function ImportProxyModal({ onClose, onPickZip }: { onClose: () => void; 
     setBusy(true);
     setError(null);
     try {
-      await importWsdl(wsdlText);
+      await importWsdl(wsdlText, templateId || undefined);
       onClose();
     } catch (err) {
       setError((err as Error).message);
@@ -234,6 +305,10 @@ export function ImportProxyModal({ onClose, onPickZip }: { onClose: () => void; 
       setBusy(false);
     }
   };
+
+  const templateStep = (
+    <TemplateStep templates={templates} value={templateId} onChange={setTemplateId} disabled={busy} />
+  );
 
   const titles: Record<Mode, string> = {
     choose: 'Import proxy',
@@ -315,6 +390,7 @@ export function ImportProxyModal({ onClose, onPickZip }: { onClose: () => void; 
               Bash-style commands only (for example, copied from a browser's DevTools → Copy as cURL).
             </div>
           </div>
+          {templateStep}
           {error && (
             <p style={{ 
               color: 'var(--error-ink)', 
@@ -377,6 +453,7 @@ export function ImportProxyModal({ onClose, onPickZip }: { onClose: () => void; 
           error={error}
           onBack={() => goTo('choose')}
           onSubmit={submitOpenApi}
+          templateStep={templateStep}
         />
       )}
 
@@ -401,6 +478,7 @@ export function ImportProxyModal({ onClose, onPickZip }: { onClose: () => void; 
           error={error}
           onBack={() => goTo('choose')}
           onSubmit={submitPostman}
+          templateStep={templateStep}
         />
       )}
 
@@ -425,6 +503,7 @@ export function ImportProxyModal({ onClose, onPickZip }: { onClose: () => void; 
           error={error}
           onBack={() => goTo('choose')}
           onSubmit={submitWsdl}
+          templateStep={templateStep}
         />
       )}
     </Modal>

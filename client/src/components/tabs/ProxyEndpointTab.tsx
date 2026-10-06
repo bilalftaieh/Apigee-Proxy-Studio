@@ -2,7 +2,9 @@ import { useStore } from '../../store/useStore';
 import { StepList } from '../StepList';
 import { ConditionalFlowsSection } from '../ConditionalFlowsSection';
 import { FaultRulesSection } from '../FaultRulesSection';
+import { ConditionCheck } from '../ConditionCheck';
 import { Icon } from '../Icon';
+import { analyzeCondition, conditionTone } from '../../lib/conditionLint';
 import type { RouteRuleMode } from '../../types/proxy';
 
 export function ProxyEndpointTab() {
@@ -93,6 +95,7 @@ export function ProxyEndpointTab() {
         stepLocation={(flowId, phase) => ({ scope: 'flow', flowId, phase })}
         emptyHint="No conditional flows. Traffic falls through PreFlow → RouteRule → PostFlow."
         phaseNumber={2}
+        basePath={proxy.basePath}
       />
 
       <div className="card">
@@ -144,8 +147,15 @@ export function ProxyEndpointTab() {
         )}
         {proxy.routeRules.map((rr) => {
           const mode = rr.mode || 'target';
+          const analysis = analyzeCondition(rr.condition || '', { basePath: proxy.basePath });
+          const tone = conditionTone(analysis);
+          const checkId = `route-rule-condition-check-${rr.id}`;
           return (
-            <div className="entity-row" key={rr.id}>
+            /* The row itself is a single line of controls; anything the check
+               has to say goes under it, inside this wrapper, so it doesn't
+               become a fifth column squeezing the condition field. */
+            <div className="route-rule-row" key={rr.id}>
+            <div className="entity-row">
               <input
                 style={{ width: 110, fontFamily: 'var(--font-mono)' }}
                 value={rr.name}
@@ -200,6 +210,9 @@ export function ProxyEndpointTab() {
               )}
               <input
                 style={{ flex: 1, fontFamily: 'var(--font-mono)' }}
+                data-tone={tone}
+                aria-invalid={tone === 'error' || undefined}
+                aria-describedby={checkId}
                 value={rr.condition || ''}
                 onChange={(e) => updateRouteRule(rr.id, { condition: e.target.value })}
                 placeholder='e.g. request.header.X-Env = "canary" — leave blank to always match'
@@ -212,6 +225,13 @@ export function ProxyEndpointTab() {
               >
                 <Icon name="trash-2" size={14} />
               </button>
+            </div>
+            <ConditionCheck
+              compact
+              analysis={analysis}
+              describedById={checkId}
+              fixFor={(issue) => () => updateRouteRule(rr.id, { condition: issue.fix!.condition })}
+            />
             </div>
           );
         })}

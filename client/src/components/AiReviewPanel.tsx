@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { api } from '../api/client';
 import { Icon } from './Icon';
+import { AiModelPicker } from './AiModelPicker';
 import { AiFixModal, type FixableFinding } from './AiFixModal';
 import { EntityJumpButton } from './EntityJumpButton';
 import type { AiPreview, AiReviewFinding, AiReviewSeverity, Policy } from '../types/proxy';
@@ -105,24 +106,15 @@ export function AiReviewPanel() {
   const reviewing = useStore((s) => s.reviewing);
   const runAiReview = useStore((s) => s.runAiReview);
 
-  const [aiReady, setAiReady] = useState<boolean | null>(null);
+  // Read off the store rather than fetched here. This used to be an effect
+  // repeated verbatim in three components, each throwing away everything but
+  // `configured` — which is why nothing could show which model was running.
+  // The subscription is unconditional and the opt-out is applied after it: a
+  // hook behind `&&` would be skipped on the render where aiDisabled is true.
+  const aiStatus = useStore((s) => s.aiStatus);
+  const aiReady = !proxy.aiDisabled && aiStatus?.configured === true;
   const [preview, setPreview] = useState<AiPreview | null>(null);
   const [showPreview, setShowPreview] = useState(false);
-
-  useEffect(() => {
-    if (proxy.aiDisabled) {
-      setAiReady(false);
-      return;
-    }
-    let cancelled = false;
-    api
-      .aiStatus()
-      .then((s) => !cancelled && setAiReady(s.configured))
-      .catch(() => !cancelled && setAiReady(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [proxy.aiDisabled]);
 
   useEffect(() => {
     if (!showPreview) return;
@@ -151,10 +143,16 @@ export function AiReviewPanel() {
             Advisory only: nothing here blocks Export, and it is a second opinion, not a verdict.
           </p>
         </div>
-        <button className="btn btn-primary" onClick={runAiReview} disabled={reviewing}>
-          {reviewing ? <span className="spinner" /> : <Icon name="sparkles" size={14} />}
-          {reviewing ? 'Reviewing…' : aiReview ? 'Review again' : 'Review with AI'}
-        </button>
+        {/* A review reports its failures as a toast, which has nowhere to put a
+            button — so the way out of a busy model is this chip, sitting next
+            to the control that just failed. */}
+        <div className="ai-action-row">
+          <AiModelPicker />
+          <button className="btn btn-primary" onClick={runAiReview} disabled={reviewing}>
+            {reviewing ? <span className="spinner" /> : <Icon name="sparkles" size={14} />}
+            {reviewing ? 'Reviewing…' : aiReview ? 'Review again' : 'Review with AI'}
+          </button>
+        </div>
       </div>
 
       <button className="ai-disclosure-toggle" onClick={() => setShowPreview((v) => !v)}>

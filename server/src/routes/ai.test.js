@@ -208,3 +208,45 @@ test('both review endpoints need a proxy', async () => {
     }
   });
 });
+
+test('the model can be switched at runtime, and reset back to .env', async () => {
+  // The reason this endpoint exists: the free tier returns 503 at peak times,
+  // and the cure used to be editing .env and restarting the server — which
+  // threw away whatever the user had typed into the modal that just failed.
+  const originalModel = process.env.GEMINI_MODEL;
+  process.env.GEMINI_MODEL = 'gemini-3.6-flash';
+
+  try {
+    await withServer(async (base) => {
+      const switched = await post(base, '/ai/model', { model: 'gemini-3.1-flash-lite' });
+      assert.equal(switched.status, 200);
+      const applied = await switched.json();
+      assert.equal(applied.model, 'gemini-3.1-flash-lite');
+      assert.equal(applied.source, 'override');
+
+      // /ai/status is what every AI surface reads, so it has to agree — the
+      // chip in the UI must never report a model other than the one in force.
+      const status = await (await fetch(`${base}/ai/status`)).json();
+      assert.equal(status.model, 'gemini-3.1-flash-lite');
+      assert.equal(status.source, 'override');
+
+      const reset = await post(base, '/ai/model', { model: null });
+      assert.equal((await reset.json()).model, 'gemini-3.6-flash', 'clearing returns to .env, not to our default');
+    });
+  } finally {
+    if (originalModel === undefined) delete process.env.GEMINI_MODEL;
+    else process.env.GEMINI_MODEL = originalModel;
+  }
+});
+
+test('a model name that could not be one is a 400, not an override', async () => {
+  await withServer(async (base) => {
+    const res = await post(base, '/ai/model', { model: '../../secrets' });
+    assert.equal(res.status, 400);
+    assert.match((await res.json()).error, /not a valid model name/);
+
+    // And nothing was applied: the previous model is still the one in force.
+    const status = await (await fetch(`${base}/ai/status`)).json();
+    assert.equal(status.source, 'env');
+  });
+});

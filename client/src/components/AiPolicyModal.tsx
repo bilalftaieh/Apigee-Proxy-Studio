@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { DiffEditor } from '@monaco-editor/react';
 import { Modal } from './Modal';
 import { Icon } from './Icon';
+import { AiModelPicker } from './AiModelPicker';
+import { AiErrorBar, toAiError, type AiError } from './AiErrorBar';
 import { api } from '../api/client';
 import { useStore } from '../store/useStore';
 import { setupApigeeMonaco } from '../lib/monacoApigee';
@@ -27,7 +29,7 @@ export function AiPolicyModal({ onClose }: { onClose: () => void }) {
   const [intent, setIntent] = useState('');
   const [policyType, setPolicyType] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<AiError | null>(null);
   const [result, setResult] = useState<AiPolicyResult | null>(null);
   const [preview, setPreview] = useState<AiPreview | null>(null);
   const [showPreview, setShowPreview] = useState(false);
@@ -80,7 +82,7 @@ export function AiPolicyModal({ onClose }: { onClose: () => void }) {
     try {
       setResult(await api.generateAiPolicy({ intent, policyType: policyType || null, proxy: currentProxy }));
     } catch (err) {
-      setError((err as Error).message);
+      setError(toAiError(err));
     } finally {
       setBusy(false);
     }
@@ -142,6 +144,7 @@ export function AiPolicyModal({ onClose }: { onClose: () => void }) {
               ))}
             </select>
           </div>
+          <AiModelPicker />
           <button className="btn btn-primary" disabled={busy || !intent.trim()} onClick={generate}>
             {busy ? <span className="spinner" /> : <Icon name="sparkles" size={14} />}
             {busy ? 'Generating…' : 'Generate'}
@@ -188,12 +191,7 @@ export function AiPolicyModal({ onClose }: { onClose: () => void }) {
           </div>
         )}
 
-        {error && (
-          <div className="ai-error">
-            <Icon name="alert-triangle" size={14} />
-            <span>{error}</span>
-          </div>
-        )}
+        {error && <AiErrorBar error={error} onRetry={generate} busy={busy} />}
 
         {result && (
           <div className="ai-result">

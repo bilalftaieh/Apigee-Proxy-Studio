@@ -2,12 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StepList } from './StepList';
 import { Icon } from './Icon';
 import { Switch } from './Switch';
-import { computeFlowCondition } from '../lib/condition';
+import { ConditionCheck } from './ConditionCheck';
+import { computeFlowCondition, toApigeePathPattern } from '../lib/condition';
+import { analyzeCondition, countBySeverity } from '../lib/conditionLint';
+import type { ConditionAnalysis, ConditionIssue } from '../lib/conditionLint';
 import { useUiStore } from '../store/useUiStore';
 import type { StepLocation } from '../store/useStore';
 import type { ConditionVerb, Flow, PathOperator } from '../types/proxy';
 
 const VERBS: ConditionVerb[] = ['ANY', 'GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'];
+const VERB_SET = new Set<string>(VERBS);
 
 /**
  * Above this many flows the cards start collapsed.
@@ -51,6 +55,7 @@ export function ConditionalFlowsSection({
   stepLocation,
   emptyHint,
   phaseNumber,
+  basePath,
 }: {
   flows: Flow[];
   onAdd: () => void;
@@ -60,6 +65,8 @@ export function ConditionalFlowsSection({
   stepLocation: (flowId: string, phase: 'request' | 'response') => StepLocation;
   emptyHint: string;
   phaseNumber?: number;
+  /** The proxy's base path, so the condition check can tell request.path apart from proxy.pathsuffix. */
+  basePath?: string;
 }) {
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const jumpToNewRef = useRef(false);
@@ -74,6 +81,16 @@ export function ConditionalFlowsSection({
   const setManyFlowsExpanded = useUiStore((s) => s.setManyFlowsExpanded);
   const revealedFlowId = useUiStore((s) => s.revealedFlowId);
   const clearRevealedFlow = useUiStore((s) => s.clearRevealedFlow);
+
+  /* Every flow's condition, read back. Done for the whole list rather than
+     per open card because a collapsed card still has to be able to say that
+     something inside it is broken — a condition that can never match is
+     exactly the kind of thing that hides behind a chevron for a week. */
+  const analyses = useMemo(() => {
+    const byId = new Map<string, ConditionAnalysis>();
+    for (const flow of flows) byId.set(flow.id, analyzeCondition(flow.condition, { basePath }));
+    return byId;
+  }, [flows, basePath]);
 
   const collapsible = flows.length > COLLAPSE_ABOVE;
   const expandedSet = useMemo(() => new Set(expandedFlowIds), [expandedFlowIds]);
@@ -138,6 +155,74 @@ export function ConditionalFlowsSection({
       condition: computeFlowCondition(pathOperator, pathValue, verb),
     });
   };
+
+  /* Path / Verb mode owns pathValue and rebuilds the condition from it on every
+     keystroke, so a fix that rewrote the condition string would be undone by
+     the next one. The issues that can reach this mode are all about the path,
+     so they are re-expressed as patches to the field that owns it. */
+  const simpleFix = (flow: Flow, issue: ConditionIssue): (() => void) | null => {
+    const path = flow.pathValue || '';
+    switch (issue.id) {
+      case 'path-equals-wildcard':
+        return () => applySimple(flow, { pathOperator: 'MatchesPath' });
+      case 'path-no-slash':
+        return path && !path.startsWith('/') ? () => applySimple(flow, { pathValue: `/${path}` }) : null;
+      case 'path-query':
+        return path.includes('?') ? () => applySimple(flow, { pathValue: path.slice(0, path.indexOf('?')) }) : null;
+      default:
+        return null;
+    }
+  };
+
+  /**
+   * Whether a hand-typed condition can be handed back to the Path / Verb
+   * controls without losing anything. `simpleEquivalent` says the condition is
+   * only a path and a verb; the rest checks that this app's two controls can
+   * actually spell those — an unlisted verb, or a path that changes shape on
+   * its way through toApigeePathPattern, would come back out different.
+   */
+  const canUseBuilder = (analysis: ConditionAnalysis): boolean =>
+    analysis.simpleEquivalent &&
+    (!analysis.verb || VERB_SET.has(analysis.verb)) &&
+    (!analysis.path || toApigeePathPattern(analysis.path) === analysis.path);
+
+  /** The Path / Verb fields a builder-expressible condition implies. */
+  const builderFields = (analysis: ConditionAnalysis): Pick<Flow, 'pathValue' | 'pathOperator' | 'verb'> => ({
+    pathValue: analysis.path ?? '',
+    pathOperator: analysis.pathOperator === 'Equals' ? 'Equals' : 'MatchesPath',
+    verb: (analysis.verb as ConditionVerb) ?? 'ANY',
+  });
+
+  /**
+   * A hand-typed condition, plus the Path / Verb fields behind it.
+   *
+   * The two modes are not independent: switching to Path / Verb rebuilds the
+   * condition from pathValue/pathOperator/verb, so leaving those stale while
+   * the string is edited by hand means that switch quietly replaces what was
+   * typed. When the condition is only a path and a verb they are exactly
+   * recoverable from it — so recover them on every keystroke, and the two
+   * modes stay two views of one thing rather than two rival sources.
+   *
+   * A condition the builder cannot hold (an `or`, a header test) leaves them
+   * alone: there is nothing truthful to put there.
+   */
+  const applyCustom = (flow: Flow, condition: string) => {
+    const analysis = analyzeCondition(condition, { basePath });
+    onUpdate(flow.id, {
+      condition,
+      conditionMode: 'custom',
+      ...(canUseBuilder(analysis) ? builderFields(analysis) : null),
+    });
+  };
+
+  /**
+   * Switching to Path / Verb. Seeds from the condition itself when the builder
+   * can hold it — applyCustom keeps that true for anything typed here, but a
+   * flow that arrived from an import has a condition and nothing behind it,
+   * and reading those empty fields back would throw the condition away.
+   */
+  const useBuilder = (flow: Flow, analysis: ConditionAnalysis) =>
+    applySimple(flow, canUseBuilder(analysis) ? builderFields(analysis) : {});
 
   const handleAdd = () => {
     jumpToNewRef.current = true;
@@ -246,6 +331,11 @@ export function ConditionalFlowsSection({
         const open = isOpen(flow.id);
         const summary = flowSummary(flow);
         const bodyId = `flow-body-${flow.id}`;
+        const checkId = `flow-condition-check-${flow.id}`;
+        const analysis = analyses.get(flow.id)!;
+        const counts = countBySeverity(analysis.issues);
+        // Proxies saved before `condition` was always written still reach here.
+        const conditionText = flow.condition || '';
         return (
         <div
           className={`flow-card ${isEnabled ? '' : 'flow-card-disabled'} ${flow.id === flashId ? 'flow-card-new' : ''}`}
@@ -336,6 +426,18 @@ export function ConditionalFlowsSection({
                 <span className="flow-card-summary-route mono" title={flow.condition || undefined}>
                   {summary.route}
                 </span>
+                {/* A condition that can never match is the one thing that must
+                    not stay hidden behind a chevron. */}
+                {(counts.errors > 0 || counts.warnings > 0) && (
+                  <span
+                    className="flow-card-summary-flag"
+                    data-severity={counts.errors > 0 ? 'error' : 'warning'}
+                    title={analysis.issues.map((issue) => issue.message).join('\n\n')}
+                  >
+                    <Icon name={counts.errors > 0 ? 'x-circle' : 'alert-triangle'} size={11} />
+                    {counts.errors + counts.warnings}
+                  </span>
+                )}
                 <span className="flow-card-summary-steps">{summary.steps}</span>
                 {flow.description && <span className="flow-card-summary-desc">{flow.description}</span>}
               </button>
@@ -354,7 +456,12 @@ export function ConditionalFlowsSection({
                 <button
                   type="button"
                   className={flow.conditionMode !== 'custom' ? 'active' : ''}
-                  onClick={() => applySimple(flow, {})}
+                  onClick={() => useBuilder(flow, analysis)}
+                  title={
+                    flow.conditionMode === 'custom' && conditionText.trim() && !canUseBuilder(analysis)
+                      ? 'These controls can only express a path and a verb, so switching rebuilds the condition from them and drops what you typed'
+                      : undefined
+                  }
                 >
                   Path / Verb
                 </button>
@@ -371,9 +478,14 @@ export function ConditionalFlowsSection({
             {flow.conditionMode === 'custom' ? (
               <input
                 className="condition-input"
+                data-tone={
+                  !conditionText.trim() ? undefined : counts.errors > 0 ? 'error' : counts.warnings > 0 ? 'warning' : 'ok'
+                }
+                aria-invalid={counts.errors > 0 || undefined}
+                aria-describedby={checkId}
                 placeholder='e.g. (proxy.pathsuffix MatchesPath "/users/*") and (request.verb = "GET")'
-                value={flow.condition}
-                onChange={(e) => onUpdate(flow.id, { condition: e.target.value })}
+                value={conditionText}
+                onChange={(e) => applyCustom(flow, e.target.value)}
               />
             ) : (
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -402,9 +514,30 @@ export function ConditionalFlowsSection({
               </div>
             )}
 
-            <div className="field-hint mono" style={{ marginTop: 8 }}>
-              {flow.condition || 'No condition — matches every request that reaches this flow.'}
-            </div>
+            {/* In Path / Verb mode this is the only place the generated Apigee
+                condition is visible; in Custom mode the input above already
+                shows it, so repeating it there would be an echo — except when
+                it is empty, where the line still has something to say. */}
+            {(flow.conditionMode !== 'custom' || !conditionText.trim()) && (
+              <div className="field-hint mono" style={{ marginTop: 8 }}>
+                {conditionText || 'No condition — matches every request that reaches this flow.'}
+              </div>
+            )}
+
+            {conditionText.trim() && (
+              <ConditionCheck
+                analysis={analysis}
+                describedById={checkId}
+                fixFor={
+                  flow.conditionMode === 'custom'
+                    ? (issue) => () => onUpdate(flow.id, { condition: issue.fix!.condition })
+                    : (issue) => simpleFix(flow, issue)
+                }
+                onUseBuilder={
+                  flow.conditionMode === 'custom' && canUseBuilder(analysis) ? () => useBuilder(flow, analysis) : undefined
+                }
+              />
+            )}
           </div>
 
           <div className="flow-columns">

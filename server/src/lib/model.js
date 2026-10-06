@@ -203,13 +203,15 @@ export function applyEnvironmentOverrides(proxy, environmentId) {
 // A path template segment (`{petId}`) is this app's own internal notation for
 // "one variable segment" — it's what the exporters read to rebuild an OpenAPI
 // path template (openApiExporter's pathParams) or a Postman `:petId` variable,
-// so it's kept verbatim in flow.pathValue. Apigee's condition grammar has no
-// such syntax: MatchesPath only understands `*` (one segment) and `**` (many),
-// and a literal "/pets/{petId}" pattern matches nothing at all. So the
-// translation happens here, at the point the condition string is built, rather
+// so it's kept verbatim in flow.pathValue.
+//
+// It is translated to `*` at the point the condition string is built, rather
 // than in the importers — that way all three importers (OpenAPI, Postman,
 // curl) and the UI's Path/Verb builder get it right from one place, and a
-// later UI edit can't regenerate the broken form.
+// later UI edit can't regenerate a different form. It is a normalisation, not
+// a necessity — Apigee's path expressions accept `{name}` and match it as one
+// path element (conditions reference, Path expressions), so both spellings
+// match identically.
 //
 // A literal `"` is dropped rather than escaped: the pattern is interpolated
 // into a double-quoted condition string, and Apigee's grammar offers no

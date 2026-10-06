@@ -509,10 +509,35 @@ export interface Template {
   updatedAt?: number;
 }
 
+/** One entry in the model picker's menu. */
+export interface AiModelOption {
+  id: string;
+  label: string;
+  /** What the trade is, shown under the name — not a restatement of the id. */
+  note: string;
+  /** One of the two this app vouches for; shown above the rest. */
+  recommended?: boolean;
+}
+
+/** The full lineup, fetched from Google when the picker opens. */
+export interface AiModelList {
+  models: AiModelOption[];
+  /**
+   * 'live' came from Google just now, 'stale' is a cached list served because
+   * the refetch failed, 'catalog' is the built-in pair when there has never
+   * been a successful fetch. All three are usable; the UI does not distinguish.
+   */
+  source: 'live' | 'stale' | 'catalog';
+}
+
 export interface AiStatus {
   configured: boolean;
   provider: string;
+  /** The model in force right now, which is not necessarily the one in .env. */
   model: string;
+  /** 'override' means someone switched it in the app and a restart undoes it. */
+  source: 'env' | 'override';
+  models: AiModelOption[];
 }
 
 /** What a generation would send — shown to the user before anything leaves the machine. */

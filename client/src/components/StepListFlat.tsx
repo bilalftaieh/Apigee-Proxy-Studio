@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Icon } from './Icon';
+import { ConditionCheck } from './ConditionCheck';
 import { policyCategory, policyAbbr } from '../lib/policyCategory';
+import { analyzeCondition, conditionTone } from '../lib/conditionLint';
 import type { Step } from '../types/proxy';
 
 export function StepListFlat({
@@ -37,7 +39,11 @@ export function StepListFlat({
         {steps.length === 0 && (
           <div className="step-list-empty">No steps attached.</div>
         )}
-        {steps.map((step, i) => (
+        {steps.map((step, i) => {
+          const analysis = analyzeCondition(step.condition || '');
+          const tone = conditionTone(analysis);
+          const checkId = `flat-step-condition-check-${step.policyName}-${i}`;
+          return (
           <div className="step-item" key={`${step.policyName}-${i}`}>
             <div className="step-item-main">
               <div className="step-order-btns">
@@ -90,13 +96,23 @@ export function StepListFlat({
               <Icon name="split" size={12} />
               <input
                 className="condition-input step-condition-input"
+                data-tone={tone}
+                aria-invalid={tone === 'error' || undefined}
+                aria-describedby={checkId}
                 value={step.condition || ''}
                 onChange={(e) => onUpdate(i, { condition: e.target.value || undefined })}
                 placeholder='Condition (optional) — e.g. request.header.X-Env = "canary"'
               />
             </div>
+            <ConditionCheck
+              compact
+              analysis={analysis}
+              describedById={checkId}
+              fixFor={(issue) => () => onUpdate(i, { condition: issue.fix!.condition })}
+            />
           </div>
-        ))}
+          );
+        })}
       </div>
       {availablePolicies.length > 0 ? (
         <div className="step-add-row">

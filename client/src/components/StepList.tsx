@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { useStore, type StepLocation } from '../store/useStore';
 import type { Step } from '../types/proxy';
 import { Icon } from './Icon';
+import { ConditionCheck } from './ConditionCheck';
 import { policyCategory, policyAbbr } from '../lib/policyCategory';
+import { analyzeCondition, conditionTone } from '../lib/conditionLint';
 
 export function StepList({ location, steps }: { location: StepLocation; steps: Step[] }) {
   const proxy = useStore((s) => s.currentProxy)!;
@@ -30,7 +32,11 @@ export function StepList({ location, steps }: { location: StepLocation; steps: S
         {steps.length === 0 && (
           <div className="step-list-empty">No steps attached.</div>
         )}
-        {steps.map((step, i) => (
+        {steps.map((step, i) => {
+          const analysis = analyzeCondition(step.condition || '');
+          const tone = conditionTone(analysis);
+          const checkId = `step-condition-check-${step.policyName}-${i}`;
+          return (
           <div className="step-item" key={`${step.policyName}-${i}`}>
             <div className="step-item-main">
               <div className="step-order-btns">
@@ -84,13 +90,23 @@ export function StepList({ location, steps }: { location: StepLocation; steps: S
               <Icon name="split" size={12} />
               <input
                 className="condition-input step-condition-input"
+                data-tone={tone}
+                aria-invalid={tone === 'error' || undefined}
+                aria-describedby={checkId}
                 value={step.condition || ''}
                 onChange={(e) => updateStep(location, i, { condition: e.target.value || undefined })}
                 placeholder='Condition (optional) — e.g. request.header.X-Env = "canary"'
               />
             </div>
+            <ConditionCheck
+              compact
+              analysis={analysis}
+              describedById={checkId}
+              fixFor={(issue) => () => updateStep(location, i, { condition: issue.fix!.condition })}
+            />
           </div>
-        ))}
+          );
+        })}
       </div>
       {availablePolicies.length > 0 ? (
         <div className="step-add-row">

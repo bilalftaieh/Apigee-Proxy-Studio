@@ -1,4 +1,7 @@
 import 'dotenv/config';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import policyTypesRouter from './routes/policyTypes.js';
 import policyChainsRouter from './routes/policyChains.js';
@@ -25,8 +28,13 @@ const app = express();
 // API_PORT is scoped to this app on purpose — the generic PORT env var is
 // commonly injected by editors, launchers and deploy platforms for whatever
 // process THEY consider "the" server, which can silently collide with this
-// one. Set API_PORT (in server/.env or your shell) to change it; PORT is
-// still honored as a fallback for platforms that only ever set that.
+// one. Set API_PORT to change it — in the .env at the REPO ROOT, which is the
+// only one `dotenv/config` above ever reads (it resolves .env against the
+// working directory, and every way of starting this app runs from the root),
+// or in your shell, which wins over the file. PORT is still honored as a
+// fallback for platforms that only ever set that. scripts/studio.ps1 resolves
+// the port the same way, in the same order, so the launcher always opens the
+// port this actually binds.
 const PORT = process.env.API_PORT || process.env.PORT || 4310;
 
 // No CORS middleware on purpose: the client only ever calls the relative
@@ -63,6 +71,114 @@ app.use('/api', aiRouter);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
+// Serves the built client (`npm run build`) when it's present, so the whole
+// app can run as one process on one port without the Vite dev server. Gated
+// on the dist folder existing rather than NODE_ENV, so a plain `npm run
+// dev:server` with a stale build still works and nothing breaks for anyone
+// who never runs the build.
+const serverSrc = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.join(serverSrc, '../..');
+const clientDist = path.join(repoRoot, 'client/dist');
+const clientIndex = path.join(clientDist, 'index.html');
+
+// Monaco, served off disk instead of from a CDN — see client/src/lib/
+// monacoSetup.ts for why. This is monaco-editor's own prebuilt AMD bundle
+// (loader, editor, language workers), served verbatim: nothing builds it and
+// nothing copies it, so the client build stays 4.5s instead of 45s.
+//
+// Two candidates because npm may hoist the package to the workspace root or
+// leave it under client/. Resolved by looking rather than by `require.resolve`,
+// which monaco's exports map blocks for package.json.
+const monacoVsDir = [
+  path.join(repoRoot, 'node_modules/monaco-editor/min/vs'),
+  path.join(repoRoot, 'client/node_modules/monaco-editor/min/vs'),
+].find((dir) => fs.existsSync(dir));
+
+// Set by scripts/studio.ps1 when it runs `vite build --watch` alongside the
+// server: the bundle on disk will change under a page that is already open, so
+// index.html gets a few lines that poll for a new build and reload. Off by
+// default — a plain `npm start` serves the file byte for byte, and this never
+// touches anything but the HTML document itself.
+const watchMode = process.env.STUDIO_WATCH === '1';
+
+// Vite renames the hashed asset files on every meaningful rebuild, so the
+// mtime of index.html alone is a sufficient build id.
+const buildId = () => {
+  try {
+    return String(fs.statSync(clientIndex).mtimeMs);
+  } catch {
+    return null;
+  }
+};
+
+// 2s, not 1s: a watch build takes ~2s anyway, so a faster poll cannot make the
+// reload arrive sooner — it only doubles the request count against a server the
+// launcher leaves running all day. `data.id === null` is the window where the
+// watcher has emptied client/dist and not yet rewritten it; holding the last
+// known id through it is what stops a rebuild from looking like a change.
+const reloadSnippet = `
+<script>
+(function () {
+  var current = null;
+  setInterval(function () {
+    fetch('/api/build-id').then(function (r) { return r.json(); }).then(function (data) {
+      if (data.id === null) return;
+      if (current === null) { current = data.id; return; }
+      if (data.id !== current) location.reload();
+    }).catch(function () {});
+  }, 2000);
+})();
+</script>
+`;
+
+const sendIndex = (req, res, next) => {
+  if (!watchMode) {
+    res.sendFile(clientIndex);
+    return;
+  }
+  fs.readFile(clientIndex, 'utf8', (err, html) => {
+    if (err) {
+      next(err);
+      return;
+    }
+    // A rebuild can catch us between Vite emptying dist and writing the new
+    // index.html; appending rather than requiring a </body> match means the
+    // page still loads if the document is ever not what we expect.
+    res.type('html').send(html.includes('</body>')
+      ? html.replace('</body>', `${reloadSnippet}</body>`)
+      : html + reloadSnippet);
+  });
+};
+
+// Ahead of the SPA fallback below, which would otherwise answer /vs/loader.js
+// with index.html and leave the editor failing on a syntax error. Mounted
+// whether or not client/dist exists, so `npm run dev` (which proxies /vs here)
+// works without a build. Left on express.static's default caching: these files
+// are immutable for a given monaco-editor version but their URLs are not
+// versioned, so a revalidation per load is the honest trade — and it costs
+// about a millisecond each over loopback.
+if (monacoVsDir) {
+  app.use('/vs', express.static(monacoVsDir));
+} else {
+  log.warn('monaco-editor not found on disk — the code editors will not load', {
+    looked: ['node_modules/monaco-editor/min/vs', 'client/node_modules/monaco-editor/min/vs'],
+  });
+}
+
+if (fs.existsSync(clientIndex)) {
+  if (watchMode) {
+    app.get('/api/build-id', (req, res) => res.json({ id: buildId() }));
+    // Ahead of express.static, which would otherwise answer `/` with the
+    // unmodified file and leave that one page unable to notice a rebuild.
+    app.get('/', sendIndex);
+  }
+  app.use(express.static(clientDist));
+  // SPA fallback for client-side routes — but never swallow an unmatched
+  // /api/* request into index.html, or a typo'd endpoint would "succeed"
+  // with an HTML body instead of a 404.
+  app.get(/^(?!\/api).*/, sendIndex);
+}
+
 // Logs the stack against the request id and returns that id to the caller, so
 // the toast the user is looking at names the line to search for.
 app.use(errorLogger());
@@ -91,7 +207,7 @@ server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
     log.fatal('port already in use', { port: PORT });
     console.error(`\nPort ${PORT} is already in use — is another "npm run dev:server" already running?`);
-    console.error(`Set API_PORT to a different value (in server/.env or your shell) and retry.\n`);
+    console.error(`Set API_PORT to a different value (in the .env at the repo root, or your shell) and retry.\n`);
     flushSync();
     process.exit(1);
   }

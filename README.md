@@ -15,6 +15,10 @@ touches GCP from this tool.
 
 ## Running it
 
+Two modes, depending on whether you're editing the code or just using the tool.
+
+### Development
+
 ```bash
 npm install
 npm run dev
@@ -22,27 +26,138 @@ npm run dev
 
 This starts the API on `http://localhost:4310` and the UI on `http://localhost:5173`
 (the Vite dev server proxies `/api` to the backend). Open the UI URL in a browser.
+Both processes reload on change.
+
+### As an app
+
+Build once and the API server serves the UI itself, so there's one process on one
+port — no Vite, no second window:
+
+```bash
+npm run build
+npm start
+```
+
+Then open `http://127.0.0.1:4310`. The static mount is keyed on `client/dist`
+existing rather than on `NODE_ENV`, so a plain `npm start` after a build is all
+it takes.
+
+### As an app, without typing anything (Windows)
+
+`Studio.cmd` in the repo root does the two commands above for you, and only when
+they're needed. Double-click it (or `npm run app`) and it will:
+
+- run `npm install` if `node_modules` is missing, and build the UI if
+  `client/dist` isn't there yet;
+- start the server hidden in the background if nothing is already answering on
+  its port — if the app is already up it just opens the browser, so clicking it
+  twice is harmless;
+- start a watcher that rebuilds `client/dist` whenever client code changes, and
+  reloads any page you have open (see below);
+- open `http://127.0.0.1:4310`.
+
+```bash
+Studio.cmd            # start if needed, then open the app
+Studio.cmd status     # is the server and watcher up, and on which port
+Studio.cmd restart    # rebuild, then restart (after a git pull, or a server change)
+Studio.cmd stop
+```
+
+To never think about it again:
+
+```bash
+Studio.cmd install
+```
+
+That registers a `Apigee Proxy Studio` logon task so the server is running from
+the moment you sign in, and drops a Desktop shortcut. After that, a bookmark to
+`http://127.0.0.1:4310` behaves like any other web app. `Studio.cmd uninstall`
+removes both.
+
+#### Picking up client changes
+
+The watcher runs `vite build --watch`, so an edit under `client/src` lands in
+`client/dist` in about a second, and the server starts with `STUDIO_WATCH=1`,
+which adds a few lines to the served `index.html` that poll `/api/build-id` and
+reload the page when the build id changes. Edit a component, look at the
+browser, see the change — no build step, no refresh.
+
+Two things it is not:
+
+- **It is not the Vite dev server.** There's no HMR, so a reload is a full
+  reload and component state goes with it. `npm run dev` is still the better
+  seat for a long UI session; this is for using the tool while occasionally
+  changing it.
+- **It does not type-check.** `vite build --watch` skips the `tsc -b` pass that
+  `npm run build` runs, so type errors surface in your editor and at the next
+  full build (`Studio.cmd restart`, or `-Rebuild`), not in the watcher log.
+
+Server-side changes are not watched at all — `server/` is a plain `node` process
+here, so `Studio.cmd restart` after editing it. `Studio.cmd` with `-NoWatch`
+skips the watcher entirely (and `install -NoWatch` registers a logon task that
+just serves the last build, if you'd rather not have a watcher resident all
+day). Watcher output goes to `server/logs/watcher.*.log`.
+
+Nothing above changes `npm start`: `STUDIO_WATCH` is unset there, so the server
+serves `client/dist/index.html` byte for byte and `/api/build-id` doesn't exist.
+
+#### Details
+
+The launcher reads `API_PORT` the same way the server does, so changing it in
+`.env` moves the launcher too. It deliberately does *not* run
+`scripts/free-ports.ps1` the way `npm start` does: killing whatever holds the
+port is right for a dev restart, wrong for a launcher that should attach to the
+session you already have open. Its stdout/stderr go to
+`server/logs/launcher.*.log`; the app's own structured log is still
+`server/logs/studio.log` (`npm run logs`).
+
+It also tracks the watcher by PID file (`server/logs/watcher.pid`) rather than
+by port, since the watcher doesn't listen on one, and checks the process name
+before killing so a recycled PID can't cost you an unrelated process.
+
+### Configuration
+
+Every setting is optional — copy `.env.example` to `.env` and fill in only what
+you need. The one you're most likely to want is `GEMINI_API_KEY`, which turns on
+the AI assistance; everything else already defaults to what the commands above
+use. `.env` is gitignored, so the key stays on your machine.
+
+Note that `API_HOST` defaults to `127.0.0.1` on purpose: the local API is
+unauthenticated, so it should not be reachable from your network.
 
 ## Using it
 
 1. **Start from a template or blank proxy** — the home screen offers a blank
    pass-through proxy plus a few built-in templates (secured REST API, mediation
    & fault handling).
-2. **Overview tab** — proxy identity: name, base path, description.
-3. **Proxy Endpoint tab** — the ProxyEndpoint's own PreFlow/PostFlow, conditional
+2. **Or import one** — an OpenAPI spec, WSDL, Postman collection or curl command
+   becomes the proxy's *API surface* (base path, conditional flows, target URL),
+   and the import dialog's second step can lay a template's *policy layer* on
+   top of it: policies, PreFlow/PostFlow attachments and fault handling. The
+   rule is one sentence — **the artifact owns the surface, the template owns the
+   policy layer** — so every conflict resolves toward the artifact (your base
+   path, flows and backend URL are never overwritten) and each one is reported
+   as a toast. Template steps run *before* the imported ones, since a template's
+   policies are usually the gate. Applying a template to a proxy that already
+   exists is a separate, explicit action (`POST /proxies/:id/apply-template`,
+   snapshotted to history so it's undoable); the `.zip` bundle import
+   deliberately doesn't offer the inline option, because a bundle is already a
+   complete proxy rather than a bare surface.
+3. **Overview tab** — proxy identity: name, base path, description.
+4. **Proxy Endpoint tab** — the ProxyEndpoint's own PreFlow/PostFlow, conditional
    flows (with a Path/Verb condition builder or a raw custom-expression fallback),
    route rules, and fault handling — named conditional `<FaultRule>`s matched
    top-to-bottom, plus the unconditional DefaultFaultRule they fall back to.
-4. **Target Endpoint tab** — pick a target (if you have more than one) and edit
+5. **Target Endpoint tab** — pick a target (if you have more than one) and edit
    its URL *or* a load-balanced list of named Target Servers, an optional Path,
    and that target's own independent PreFlow/PostFlow, conditional flows, and
    fault handling. Any URL/Path field can be a literal value or a `{variable}`
    reference via the Hardcode/Variable toggle.
-5. **Policies tab** — pick a policy type from the gallery (40+ types across
+6. **Policies tab** — pick a policy type from the gallery (40+ types across
    Mediation, Security, Extension, Traffic Management, Caching, Storage,
    Logging, and AI/LLM), then edit its raw XML directly in Monaco — exactly
    like the real Apigee UI.
-6. **Lint tab** — runs [apigeelint](https://github.com/apigee/apigeelint)
+7. **Lint tab** — runs [apigeelint](https://github.com/apigee/apigeelint)
    (Apigee X profile) against the current bundle and lists every error/warning
    by file. **The Export ZIP button re-runs this and blocks if any errors are
    found** — warnings are fine to ship with, matching how most CI/CD pipelines
@@ -50,13 +165,13 @@ This starts the API on `http://localhost:4310` and the UI on `http://localhost:5
    progress. Two caveats: the gate lives in the UI, so `POST /api/bundle/export`
    will happily hand you a zip without it; and if apigeelint itself fails to
    run, Export warns and proceeds rather than blocking you.
-7. **XML Preview tab** — browse every file that will be in the exported bundle,
+8. **XML Preview tab** — browse every file that will be in the exported bundle,
    generated live from your current (even unsaved) edits.
-8. **Save as Template** — snapshot the current proxy's policies/flows/routes as
+9. **Save as Template** — snapshot the current proxy's policies/flows/routes as
    a reusable skeleton for future proxies.
-9. **Export ZIP** — downloads `<proxy-name>.zip` with the exact
-   `apiproxy/{policies,proxies,targets}/...` layout Apigee X expects for
-   **Deploy > Import bundle** in the console. No deployment happens from here.
+10. **Export ZIP** — downloads `<proxy-name>.zip` with the exact
+    `apiproxy/{policies,proxies,targets}/...` layout Apigee X expects for
+    **Deploy > Import bundle** in the console. No deployment happens from here.
 
 ## Policy XML intelligence
 
@@ -226,7 +341,7 @@ recorded before it broke. File writes are batched and off the request path, so
 the verbose sink is also the cheap one.
 
 Both can be changed without a restart, from the controls at the bottom of the
-log panel. See `server/.env.example` for every setting.
+log panel. See `.env.example` for every setting.
 
 ### What is never written
 

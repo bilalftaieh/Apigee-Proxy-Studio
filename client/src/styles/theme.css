@@ -1,8 +1,26 @@
 /* The weights here must match the weights the stylesheets actually ask for.
    600 was used 35 times across the app but never requested, so every one of
    them matched to the 700 face — section headings, chips and badges were all
-   rendering a step heavier than written. 300 was requested and never used. */
-@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap');
+   rendering a step heavier than written. 300 was requested and never used.
+
+   Bundled rather than fetched from fonts.googleapis.com. This is a tool that
+   runs on one laptop against localhost, and it has no business needing the
+   network to render its own type: offline, or behind a network that blackholes
+   rather than refuses the request, a render-blocking @import at the top of the
+   sheet bought a white screen and then the fallback metrics every size here
+   was tuned against Roboto to avoid. @fontsource declares the families as
+   plain 'Roboto' and 'Roboto Mono', so --font-sans and --font-mono below are
+   unchanged and a machine that already has Roboto installed is unaffected.
+   The `latin-` prefix is the subset — the app's UI strings are all latin, and
+   the full packages ship cyrillic/greek/vietnamese faces nothing here asks
+   for. */
+@import '@fontsource/roboto/latin-400.css';
+@import '@fontsource/roboto/latin-500.css';
+@import '@fontsource/roboto/latin-600.css';
+@import '@fontsource/roboto/latin-700.css';
+@import '@fontsource/roboto-mono/latin-400.css';
+@import '@fontsource/roboto-mono/latin-500.css';
+@import '@fontsource/roboto-mono/latin-600.css';
 
 /*
   Google Cloud's *developer* surfaces — Logs Explorer, BigQuery Studio — rather
@@ -135,12 +153,13 @@
   --control-h: 32px;
   --toolbar-h: 34px;
 
-  /* Roboto first, not Google Sans. Google Sans is proprietary and Google Fonts
-     does not serve it, so the @import above never delivered it: it resolved
-     only on machines that happen to have it installed locally, and the whole
-     UI then rendered in a different typeface with different metrics from the
-     one every size and line-height here was tuned against. Naming the font we
-     actually ship makes the type deterministic. */
+  /* Roboto first, not Google Sans. Google Sans is proprietary and no font
+     service delivers it, so naming it here only ever resolved on machines that
+     happen to have it installed locally, and the whole UI then rendered in a
+     different typeface with different metrics from the one every size and
+     line-height here was tuned against. Naming the font we actually ship — and
+     now actually bundle, see the @font-face imports at the top — makes the
+     type deterministic. */
   --font-sans: Roboto, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'Roboto Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
 

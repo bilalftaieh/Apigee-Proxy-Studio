@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { DiffEditor } from '@monaco-editor/react';
 import { Modal } from './Modal';
 import { Icon } from './Icon';
+import { AiModelPicker } from './AiModelPicker';
+import { AiErrorBar, toAiError, type AiError } from './AiErrorBar';
 import { api } from '../api/client';
 import { useStore } from '../store/useStore';
 import { setupApigeeMonaco } from '../lib/monacoApigee';
@@ -30,7 +32,7 @@ export function AiFixModal({
   const applyAiFix = useStore((s) => s.applyAiFix);
 
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<AiError | null>(null);
   const [result, setResult] = useState<AiFixResult | null>(null);
   const [preview, setPreview] = useState<AiPreview | null>(null);
   const [showPreview, setShowPreview] = useState(false);
@@ -43,7 +45,7 @@ export function AiFixModal({
     try {
       setResult(await api.generateAiFix({ proxy: currentProxy, finding }));
     } catch (err) {
-      setError((err as Error).message);
+      setError(toAiError(err));
     } finally {
       setBusy(false);
     }
@@ -129,12 +131,7 @@ export function AiFixModal({
           </p>
         )}
 
-        {error && (
-          <div className="ai-error">
-            <Icon name="alert-triangle" size={14} />
-            <span>{error}</span>
-          </div>
-        )}
+        {error && <AiErrorBar error={error} onRetry={run} busy={busy} />}
 
         {result && (
           <div className="ai-result">

@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useStore } from '../../store/useStore';
-import { api } from '../../api/client';
 import { Icon } from '../Icon';
 import { AiFixModal, type FixableFinding } from '../AiFixModal';
 import { AiReviewPanel } from '../AiReviewPanel';
@@ -18,24 +17,13 @@ export function LintTab() {
   const toggleLintExclude = useStore((s) => s.toggleLintExclude);
 
   const [fixing, setFixing] = useState<{ finding: FixableFinding; policy: Policy } | null>(null);
-  // Null until the status call lands, so the button doesn't flicker in and then
-  // out again on a workspace where AI isn't configured.
-  const [aiReady, setAiReady] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    if (proxy.aiDisabled) {
-      setAiReady(false);
-      return;
-    }
-    let cancelled = false;
-    api
-      .aiStatus()
-      .then((s) => !cancelled && setAiReady(s.configured))
-      .catch(() => !cancelled && setAiReady(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [proxy.aiDisabled]);
+  // Read off the store rather than fetched here. This used to be an effect
+  // repeated verbatim in three components, each throwing away everything but
+  // `configured` — which is why nothing could show which model was running.
+  // The subscription is unconditional and the opt-out is applied after it: a
+  // hook behind `&&` would be skipped on the render where aiDisabled is true.
+  const aiStatus = useStore((s) => s.aiStatus);
+  const aiReady = !proxy.aiDisabled && aiStatus?.configured === true;
 
   return (
     <div>

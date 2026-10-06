@@ -232,6 +232,19 @@ function attrsAt(context: XmlContext): XmlAttrDef[] {
 // Providers
 // ---------------------------------------------------------------------------
 
+/** The one-line note beside a completion: what you must supply, then what you get for free. */
+function elementDetail(def: XmlElementDef): string | undefined {
+  const parts = [def.required ? 'required' : null, def.repeatable ? 'repeatable' : null].filter(Boolean);
+  if (def.default) parts.push(`default "${def.default}"`);
+  return parts.length ? parts.join(' · ') : undefined;
+}
+
+function attrDetail(attr: XmlAttrDef): string | undefined {
+  const parts = [attr.required ? 'required' : null].filter(Boolean);
+  if (attr.default) parts.push(`default "${attr.default}"`);
+  return parts.length ? parts.join(' · ') : undefined;
+}
+
 function elementSnippet(def: XmlElementDef): string {
   const attrs = (def.attrs || []).filter((a) => !a.values);
   // Only the first attribute is pre-written: `<Header name="…">` is the shape
@@ -328,7 +341,9 @@ export function hoverInfoAt(text: string, offset: number): HoverInfo | null {
   const element = parent?.children?.find((c) => c.name === token);
   if (element?.doc) {
     const parts = [`**<${token}>**`, element.doc];
-    if (element.repeatable) parts.push('_Repeatable._');
+    if (element.default) parts.push(`Defaults to \`${element.default}\`.`);
+    const notes = [element.required ? '_Required._' : null, element.repeatable ? '_Repeatable._' : null].filter(Boolean);
+    if (notes.length) parts.push(notes.join(' '));
     return at(parts.join(para));
   }
   if (context.stack[context.stack.length - 1] === token && parent?.doc) {
@@ -343,6 +358,7 @@ export function hoverInfoAt(text: string, offset: number): HoverInfo | null {
   if (attr?.doc) {
     const parts = [`**${token}**`, attr.doc];
     if (attr.default) parts.push(`Defaults to \`${attr.default}\`.`);
+    if (attr.required) parts.push('_Required._');
     return at(parts.join(para));
   }
 
@@ -411,9 +427,11 @@ function registerProviders(monaco: Monaco) {
           push({
             label: `<${def.name}>`,
             kind: def.children?.length ? CompletionItemKind.Struct : CompletionItemKind.Field,
-            detail: def.repeatable ? 'repeatable' : undefined,
+            detail: elementDetail(def),
             documentation: def.doc ? { value: def.doc } : undefined,
-            sortText: `${SORT_CATALOG}${def.name}`,
+            // Required elements sort above optional ones: the list is read top
+            // down, and the ones you cannot omit are the ones to offer first.
+            sortText: `${SORT_CATALOG}${def.required ? '0' : '1'}${def.name}`,
             filterText: def.name,
             insertText: elementSnippet(def),
             insertTextRules: CompletionItemInsertTextRule.InsertAsSnippet,
@@ -428,9 +446,9 @@ function registerProviders(monaco: Monaco) {
           push({
             label: attr.name,
             kind: CompletionItemKind.Property,
-            detail: attr.default ? `default "${attr.default}"` : undefined,
+            detail: attrDetail(attr),
             documentation: attr.doc ? { value: attr.doc } : undefined,
-            sortText: `${SORT_CATALOG}${attr.name}`,
+            sortText: `${SORT_CATALOG}${attr.required ? '0' : '1'}${attr.name}`,
             insertText: attr.values?.length
               ? `${attr.name}="\${1|${attr.values.join(',')}|}"`
               : `${attr.name}="$1"`,

@@ -9,6 +9,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { generatePolicy } from './generatePolicy.js';
+import { activeModel, clearModelCache, listModels, providerInfo, setModel } from './provider.js';
 
 const PROXY = {
   name: 'acme-payments',
@@ -313,7 +314,13 @@ test('gives up on a persistent 503 with an actionable message', async (t) => {
 
   await assert.rejects(
     () => generatePolicy({ proxy: PROXY, intent: 'cache', policyType: 'ResponseCache' }),
-    (err) => /busy right now/.test(err.message) && /GEMINI_MODEL/.test(err.message)
+    (err) =>
+      /busy right now/.test(err.message) &&
+      /switch to a lighter model/i.test(err.message) &&
+      // The escape hatch the UI turns into a button. It rides on the error
+      // rather than in the message, so the advice is actionable from where the
+      // user is standing instead of being an instruction to go and edit .env.
+      err.fallbackModel === 'gemini-3.1-flash-lite'
   );
   assert.equal(calls, 2, 'one original attempt plus one retry, then stop');
 });
@@ -340,6 +347,79 @@ test('a retired model name surfaces the successor Google names', async (t) => {
     () => generatePolicy({ proxy: PROXY, intent: 'cache', policyType: 'ResponseCache' }),
     (err) => /GEMINI_MODEL=gemini-3\.6-flash/.test(err.message)
   );
+});
+
+test('a busy request offers no fallback when it is already on the lighter model', async (t) => {
+  // Otherwise the UI shows a button that switches to the model that just
+  // failed — worse than no button, because it looks like a way out.
+  const originalFetch = globalThis.fetch;
+  const originalModel = process.env.GEMINI_MODEL;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    if (originalModel === undefined) delete process.env.GEMINI_MODEL;
+    else process.env.GEMINI_MODEL = originalModel;
+  });
+
+  process.env.GEMINI_MODEL = 'gemini-3.1-flash-lite';
+  globalThis.fetch = async () => ({
+    ok: false,
+    status: 503,
+    text: async () => JSON.stringify({ error: { code: 503, message: 'high demand' } }),
+  });
+
+  await assert.rejects(
+    () => generatePolicy({ proxy: PROXY, intent: 'cache', policyType: 'ResponseCache' }),
+    (err) => err.fallbackModel === null && !/switch to a lighter model/i.test(err.message)
+  );
+});
+
+test('a runtime override changes the model and is reported as an override', async (t) => {
+  const originalModel = process.env.GEMINI_MODEL;
+  t.after(() => {
+    setModel(null);
+    if (originalModel === undefined) delete process.env.GEMINI_MODEL;
+    else process.env.GEMINI_MODEL = originalModel;
+  });
+
+  process.env.GEMINI_MODEL = 'gemini-3.6-flash';
+  assert.equal(providerInfo().model, 'gemini-3.6-flash');
+  assert.equal(providerInfo().source, 'env');
+
+  const applied = setModel('gemini-3.1-flash-lite');
+  assert.equal(applied.model, 'gemini-3.1-flash-lite');
+  assert.equal(applied.source, 'override', 'the UI labels an override as lasting only until restart');
+  assert.equal(activeModel(), 'gemini-3.1-flash-lite');
+
+  // Clearing goes back to .env rather than to the built-in default — the file
+  // is still the permanent choice, the override was only ever borrowed.
+  assert.equal(setModel(null).model, 'gemini-3.6-flash');
+  assert.equal(setModel(null).source, 'env');
+});
+
+test('the menu always contains the model it says is active', async (t) => {
+  // A model pinned in .env that is none of ours must still appear, or the
+  // picker silently omits the very model it is reporting.
+  const originalModel = process.env.GEMINI_MODEL;
+  t.after(() => {
+    if (originalModel === undefined) delete process.env.GEMINI_MODEL;
+    else process.env.GEMINI_MODEL = originalModel;
+  });
+
+  process.env.GEMINI_MODEL = 'gemini-9-experimental';
+  const info = providerInfo();
+  assert.ok(info.models.some((m) => m.id === info.model));
+});
+
+test('a model name that could not be one is refused', () => {
+  // The name is interpolated into the request URL, so it is checked rather
+  // than trusted — and refusing is a 400, not a silent no-op.
+  for (const bad of ['../../etc/passwd', 'model name with spaces', 'a'.repeat(200), 42, {}]) {
+    assert.throws(() => setModel(bad), RangeError, `should have refused ${JSON.stringify(bad)}`);
+  }
+  // A name Google might plausibly return from a 404 is accepted, because the
+  // whole point of surfacing that message is that you can act on it.
+  assert.equal(setModel('gemini-4.0-flash-preview-11-2026').model, 'gemini-4.0-flash-preview-11-2026');
+  setModel(null);
 });
 
 test('reads the answer past a reasoning part from a thinking model', async (t) => {
@@ -373,4 +453,132 @@ test('reads the answer past a reasoning part from a thinking model', async (t) =
 
   assert.equal(result.ok, true);
   assert.equal(result.name, 'RC-CacheTokens');
+});
+
+test('the model list comes from Google, filtered to what this app can actually use', async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalKey = process.env.GEMINI_API_KEY;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = originalKey;
+  });
+  process.env.GEMINI_API_KEY = 'test-key';
+  clearModelCache();
+
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({
+      models: [
+        { name: 'models/gemini-3.6-flash', displayName: 'Gemini 3.6 Flash', supportedGenerationMethods: ['generateContent'] },
+        { name: 'models/gemini-3.1-flash-lite', displayName: 'Gemini 3.1 Flash Lite', supportedGenerationMethods: ['generateContent'] },
+        { name: 'models/gemini-3.6-pro', displayName: 'Gemini 3.6 Pro', description: 'Our most capable model.', supportedGenerationMethods: ['generateContent'] },
+        { name: 'models/gemini-2.5-flash', displayName: 'Gemini 2.5 Flash', supportedGenerationMethods: ['generateContent'] },
+        // Everything below must be filtered out. These are real entries from a
+        // live ListModels response, not invented ones — a key lists music,
+        // image, robotics and agent models in the same array as the text ones.
+        { name: 'models/text-embedding-004', supportedGenerationMethods: ['embedContent'] },
+        { name: 'models/gemma-3-27b-it', supportedGenerationMethods: ['generateContent'] },
+        { name: 'models/imagen-4.0-generate', supportedGenerationMethods: ['predict'] },
+        { name: 'models/lyria-3.5', supportedGenerationMethods: ['generateContent'] },
+        { name: 'models/nano-banana-pro-preview', supportedGenerationMethods: ['generateContent'] },
+        { name: 'models/deep-research-pro-preview-12-2025', supportedGenerationMethods: ['generateContent'] },
+        { name: 'models/antigravity-preview-latest', supportedGenerationMethods: ['generateContent'] },
+        { name: 'models/gemini-robotics-er-2-preview', supportedGenerationMethods: ['generateContent'] },
+        { name: 'models/gemini-omni-flash-preview', supportedGenerationMethods: ['generateContent'] },
+        { name: 'models/gemini-3.5-transcribe', supportedGenerationMethods: ['generateContent'] },
+        { name: 'models/gemini-3.1-flash-image', supportedGenerationMethods: ['generateContent'] },
+        { name: 'models/gemini-2.5-computer-use-preview-10-2025', supportedGenerationMethods: ['generateContent'] },
+        // Floating aliases are excluded on purpose: they change model behaviour
+        // underneath a prompt tuned against a specific one.
+        { name: 'models/gemini-flash-latest', supportedGenerationMethods: ['generateContent'] },
+      ],
+    }),
+  });
+
+  const { models, source } = await listModels();
+  const ids = models.map((m) => m.id);
+  assert.equal(source, 'live');
+
+  // Gemma answers generateContent but rejects responseSchema, which every call
+  // in this app uses — offering it would guarantee a failure on every attempt.
+  assert.ok(!ids.includes('gemma-3-27b-it'), 'gemma cannot do structured output');
+  assert.ok(!ids.includes('gemini-flash-latest'), 'floating aliases are not offered');
+  for (const rejected of [
+    'text-embedding-004',
+    'imagen-4.0-generate',
+    'lyria-3.5',
+    'nano-banana-pro-preview',
+    'deep-research-pro-preview-12-2025',
+    'antigravity-preview-latest',
+    'gemini-robotics-er-2-preview',
+    'gemini-omni-flash-preview',
+    'gemini-3.5-transcribe',
+    'gemini-3.1-flash-image',
+    'gemini-2.5-computer-use-preview-10-2025',
+  ]) {
+    assert.ok(!ids.includes(rejected), `${rejected} is not a general-purpose text model`);
+  }
+  assert.ok(ids.includes('gemini-3.6-pro'), 'a model we do not hardcode must still show up');
+
+  // The pair we vouch for comes first, in our order, whatever order Google
+  // returned them in — here it listed 3.6-flash, then 3.1-flash-lite third.
+  assert.deepEqual(ids.slice(0, 2), ['gemini-3.6-flash', 'gemini-3.1-flash-lite']);
+  // …and the rest sort newest-looking first rather than alphabetically.
+  assert.deepEqual(ids.slice(2), ['gemini-3.6-pro', 'gemini-2.5-flash']);
+  // Our own note wins over Google's description for a curated entry.
+  assert.match(models[0].note, /Default\. Best answers/);
+});
+
+test('an unreachable model list falls back to the pair we know works', async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalKey = process.env.GEMINI_API_KEY;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = originalKey;
+  });
+  process.env.GEMINI_API_KEY = 'test-key';
+
+  // No successful fetch has happened, so there is no cache to fall back on
+  // either — this is the cold path, which must still produce a usable menu.
+  clearModelCache();
+  // Losing the network must not also lose the ability to switch off a busy
+  // model — that is the one moment anybody opens this menu.
+  globalThis.fetch = async () => {
+    throw new Error('getaddrinfo ENOTFOUND');
+  };
+
+  const { models, source } = await listModels();
+  assert.equal(source, 'catalog');
+  assert.deepEqual(models.map((m) => m.id), ['gemini-3.6-flash', 'gemini-3.1-flash-lite']);
+});
+
+test('the model in force is always in the list shown beside it', async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalKey = process.env.GEMINI_API_KEY;
+  const originalModel = process.env.GEMINI_MODEL;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = originalKey;
+    if (originalModel === undefined) delete process.env.GEMINI_MODEL;
+    else process.env.GEMINI_MODEL = originalModel;
+  });
+
+  // A model pinned in .env that Google has since retired is exactly the case
+  // that produces the 404 this app translates — it must not vanish from the
+  // picker while the chip above it still names it.
+  process.env.GEMINI_API_KEY = 'test-key';
+  process.env.GEMINI_MODEL = 'gemini-1.9-retired';
+  clearModelCache();
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({
+      models: [{ name: 'models/gemini-3.6-flash', supportedGenerationMethods: ['generateContent'] }],
+    }),
+  });
+
+  const { models } = await listModels();
+  assert.ok(models.some((m) => m.id === 'gemini-1.9-retired'));
 });

@@ -3,16 +3,11 @@ import { nanoid } from 'nanoid';
 import { templatesStore, proxiesStore } from '../lib/storage.js';
 import { BUILT_IN_TEMPLATES } from '../seed/templates.js';
 import { cloneProxyFromTemplate } from '../lib/model.js';
+import { findTemplate } from '../lib/templateApply.js';
 import { requireSafeId } from '../lib/validateId.js';
 
 const router = Router();
 router.param('id', requireSafeId);
-
-async function findTemplate(id) {
-  const builtIn = BUILT_IN_TEMPLATES.find((t) => t.id === id);
-  if (builtIn) return builtIn;
-  return templatesStore.get(id);
-}
 
 router.get('/templates', async (req, res) => {
   const userTemplates = await templatesStore.list();

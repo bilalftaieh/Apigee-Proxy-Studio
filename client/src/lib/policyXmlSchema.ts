@@ -34,6 +34,8 @@ export interface XmlAttrDef {
   doc?: string;
   values?: string[];
   default?: string;
+  /** The reference states this attribute flatly as Required. */
+  required?: boolean;
 }
 
 export interface XmlElementDef {
@@ -43,6 +45,14 @@ export interface XmlElementDef {
   children?: XmlElementDef[];
   /** Allowed text-content values, offered as completions inside the element. */
   values?: string[];
+  /** Value Apigee assumes when the element is absent. */
+  default?: string;
+  /**
+   * The reference states this element flatly as Required. Conditional
+   * requirements ("Required for HMAC algorithms") are deliberately not
+   * recorded, so this is safe to surface as a hard rule.
+   */
+  required?: boolean;
   /** Text content names a flow variable, so variable completion applies inside it. */
   takesVariable?: boolean;
   /** May appear more than once under its parent (`<Header>`, `<MatchRule>`, …). */
@@ -460,6 +470,30 @@ const AUTHORED: Record<string, XmlElementDef> = {
       { name: 'XMLPayload', doc: 'Patterns applied to XML body values.', children: [{ name: 'Namespaces', children: [{ name: 'Namespace', repeatable: true, attrs: [{ name: 'prefix' }] }] }, { name: 'XPath', repeatable: true, children: [{ name: 'Expression' }, { name: 'Pattern', repeatable: true }] }] },
     ],
   },
+
+  // Authored for one element only: the GraphQL reference page carries two
+  // conflicting syntax blocks, and the generator reads the wrong one. The
+  // page-level block still says `[query|mutuation|all]` — a stale list with a
+  // typo in it — while <OperationType>'s own section says
+  // `[query|mutation|query_mutation]` and documents `query` as the default.
+  // The generator picks the richest balanced sample for the root shape, which
+  // is the page-level block, so it cannot prefer the correct one on its own.
+  //
+  // Without this, the editor offers `mutuation` and `all`, neither of which
+  // Apigee accepts, and omits `query_mutation`, which it does. Drop this entry
+  // once the reference page is fixed upstream.
+  GraphQL: {
+    name: 'GraphQL',
+    children: [
+      DISPLAY_NAME,
+      {
+        name: 'OperationType',
+        values: ['query', 'mutation', 'query_mutation'],
+        default: 'query',
+        doc: 'Which GraphQL operations may be parsed. `query_mutation` allows both; under `query`, a mutation request fails with a 4xx.',
+      },
+    ],
+  },
 };
 
 /**
@@ -644,13 +678,20 @@ function fillFrom(into: XmlElementDef, from: XmlElementDef) {
   if (!into.doc && from.doc) into.doc = from.doc;
   if (!into.values && from.values) into.values = from.values;
   if (!into.repeatable && from.repeatable) into.repeatable = from.repeatable;
+  if (into.default === undefined && from.default !== undefined) into.default = from.default;
+  if (!into.required && from.required) into.required = from.required;
 
   if (from.attrs?.length) {
     into.attrs ||= [];
     for (const attr of from.attrs) {
       const mine = into.attrs.find((a) => a.name === attr.name);
       if (!mine) into.attrs.push(attr);
-      else if (!mine.values && attr.values) mine.values = attr.values;
+      else {
+        if (!mine.values && attr.values) mine.values = attr.values;
+        if (!mine.doc && attr.doc) mine.doc = attr.doc;
+        if (mine.default === undefined && attr.default !== undefined) mine.default = attr.default;
+        if (!mine.required && attr.required) mine.required = attr.required;
+      }
     }
   }
 

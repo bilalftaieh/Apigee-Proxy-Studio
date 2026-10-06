@@ -11,8 +11,11 @@ build/
 .env.local
 !.env.example
 
-# Logs
+# Logs and launcher runtime state
 *.log
+# The logger rotates to studio.log.1 .. studio.log.5, which *.log does not match.
+*.log.[0-9]*
+*.pid
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

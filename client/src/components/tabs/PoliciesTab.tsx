@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Editor, { type Monaco, type OnMount } from '@monaco-editor/react';
 import type { editor as MonacoEditorNs } from 'monaco-editor';
 import { useStore } from '../../store/useStore';
-import { api } from '../../api/client';
 import { Icon } from '../Icon';
 import { AddPolicyModal } from '../AddPolicyModal';
 import { AiPolicyModal } from '../AiPolicyModal';
@@ -32,24 +31,13 @@ export function PoliciesTab() {
 
   const [showAdd, setShowAdd] = useState(false);
   const [showAi, setShowAi] = useState(false);
-  // Null until the status call lands, so the button doesn't flicker in and then
-  // out again on a workspace where AI isn't configured.
-  const [aiReady, setAiReady] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    if (proxy.aiDisabled) {
-      setAiReady(false);
-      return;
-    }
-    let cancelled = false;
-    api
-      .aiStatus()
-      .then((s) => !cancelled && setAiReady(s.configured))
-      .catch(() => !cancelled && setAiReady(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [proxy.aiDisabled]);
+  // Read off the store rather than fetched here. This used to be an effect
+  // repeated verbatim in three components, each throwing away everything but
+  // `configured` — which is why nothing could show which model was running.
+  // The subscription is unconditional and the opt-out is applied after it: a
+  // hook behind `&&` would be skipped on the render where aiDisabled is true.
+  const aiStatus = useStore((s) => s.aiStatus);
+  const aiReady = !proxy.aiDisabled && aiStatus?.configured === true;
   const [toDelete, setToDelete] = useState<{ id: string; name: string } | null>(null);
   /**
    * Which editor the user last chose, not which one this policy opened in.
